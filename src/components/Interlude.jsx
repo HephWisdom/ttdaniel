@@ -1,7 +1,7 @@
 import Container from "./ui/Container";
 
 const ASSETS = {
-  portrait: "/assets/tt daniel.jpeg",
+  portrait: "../assets/tt daniel.jpeg",
 };
 
 export default function AboutInterludeExact() {
