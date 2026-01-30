@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Theme boot (prevents flash) -->
+    <script>
+      (function () {
+        const saved = localStorage.getItem("theme");
+        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const useDark = saved ? saved === "dark" : prefersDark;
+        document.documentElement.classList.toggle("dark", useDark);
+      })();
+    </script>
+
+    <title>TT Daniel – Pototype</title>
+    <script type="module" crossorigin src="/ttdaniel/assets/index-CAHTYZl3.js"></script>
+  </head>
+
+  <body class="bg-white text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <div id="root"></div>
+  </body>
+</html>
+
