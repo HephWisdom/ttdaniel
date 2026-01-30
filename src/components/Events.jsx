@@ -1,4 +1,5 @@
 import Container from "./ui/Container";
+import progfeb from "../assets/26feb.jpeg";
 
 const events = [
   {
@@ -7,7 +8,7 @@ const events = [
     price: "FREE",
     venue: "Online (Zoom)",
     desc: "A curated evening of art, conversation, and community.",
-    img: "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=1600&q=80",
+    img: progfeb,
     moreHref: "#",
     registerHref: "#",
   },
@@ -17,27 +18,7 @@ const events = [
     price: "20 USD",
     venue: "Online (Zoom)",
     desc: "A curated evening of art, conversation, and community.",
-    img: "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=1600&q=80",
-    moreHref: "#",
-    registerHref: "#",
-  },
-  {
-    title: "Kingship Gathering",
-    date: "Sat, Feb 3 · 4:00pm",
-    price: "Free",
-    venue: "TT Daniel Hall",
-    desc: "Clarity, purpose, and decisive execution — with kindness.",
-    img: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1600&q=80",
-    moreHref: "#",
-    registerHref: "#",
-  },
-  {
-    title: "Strategy & Finance Clinic",
-    date: "Wed, Mar 13 · 7:30pm",
-    price: "₵120",
-    venue: "Online (Zoom)",
-    desc: "Refine your story, tighten assumptions, and align your numbers.",
-    img: "https://images.unsplash.com/photo-1556761175-4b46a572b786?auto=format&fit=crop&w=1600&q=80",
+    img: progfeb,
     moreHref: "#",
     registerHref: "#",
   },

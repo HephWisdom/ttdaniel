@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import Container from "./ui/Container";
-import Button from "./ui/Button";
 
 const nav = [
-  { href: "#about", label: "About" },
   { href: "#books", label: "Books" },
   { href: "#events", label: "Events" },
   { href: "#counselling", label: "Counselling" },
@@ -49,40 +47,26 @@ export default function Header() {
             </span>
           </button>
 
-          {/* Brand */}
+          {/* Brand → scroll to top */}
           <a
-            href="#"
+            href="#top"
             className="text-sm font-semibold tracking-[0.28em] uppercase text-white"
           >
             TT Daniel
           </a>
 
-          {/* Desktop nav (no theme toggle) */}
-          <div className="hidden items-center gap-4 md:flex">
-            <a className="text-sm text-white/70 hover:text-white" href="#">
-              Login
-            </a>
-            <Button
-              as="a"
-              href="#packages"
-              variant="ghost"
-              className="py-2 text-black border-white/20 hover:bg-white/10"
-            >
-              Cart (0)
-            </Button>
-          </div>
-
-          {/* Mobile right */}
-          <div className="md:hidden flex items-center">
-            <Button
-              as="a"
-              href="#packages"
-              variant="ghost"
-              className="py-2 text-white border-white/20 hover:bg-white/10"
-            >
-              Cart
-            </Button>
-          </div>
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-4 md:flex">
+            {nav.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="text-sm text-white/70 hover:text-white transition"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
         </div>
 
         {/* Mobile menu */}
@@ -97,33 +81,28 @@ export default function Header() {
               role="dialog"
               aria-label="Mobile navigation"
             >
-              <div className="grid gap-2">
+              <nav className="grid gap-2">
                 {nav.map((item) => (
                   <a
                     key={item.href}
                     href={item.href}
                     onClick={() => setOpen(false)}
-                    className="rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10"
+                    className="rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10 transition"
                   >
                     {item.label}
                   </a>
                 ))}
 
-                <div className="mt-2 grid gap-2 border-t border-white/10 pt-3">
+                <div className="mt-2 border-t border-white/10 pt-3">
                   <a
-                    className="rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10"
-                    href="#"
+                    href="#top"
+                    onClick={() => setOpen(false)}
+                    className="block rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10"
                   >
-                    Login
-                  </a>
-                  <a
-                    className="rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10"
-                    href="#packages"
-                  >
-                    Cart (0)
+                    Back to top
                   </a>
                 </div>
-              </div>
+              </nav>
             </div>
           </div>
         )}

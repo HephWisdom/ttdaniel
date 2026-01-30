@@ -45,7 +45,6 @@ export default function Hero() {
             style={{ animation: "marquee 22s linear infinite" }}
           >
             <MarqueeText />
-            <MarqueeText />
           </div>
         </div>
       </div>
@@ -91,11 +90,12 @@ export default function Hero() {
               className="
                 bird-clean
                 -scale-x-100
-                + scale-110
-                bird-clean
-                -scale-x-100
-                w-80 sm:w-96 md:w-[28rem] lg:w-[34rem] xl:w-[40rem]
-                drop-shadow-[0_18px_40px_rgba(0,0,0,0.35)]
+                scale-125 sm:scale-110
+                w-full max-w-md
+                sm:max-w-lg
+                md:max-w-xl
+                lg:max-w-2xl
+                drop-shadow-2xl
               "
               style={{
                 WebkitMaskImage:
@@ -114,20 +114,16 @@ export default function Hero() {
 
 function MarqueeText() {
   return (
-    <div className="flex items-center gap-[6vw] pr-[6vw]">
-      <span
-        className="
-          font-semibold tracking-[-0.02em]
-          text-white
-          leading-none
-          text-[22vw]
-          sm:text-[20vw]
-          md:text-[18vw]
-          lg:text-[25vw]
-        "
-      >
-        EXCELLENCE KINDNESS GLORY ROYALY 
-      </span>
+    <div className="relative overflow-hidden w-full">
+      <div className="marquee-track flex w-max">
+        <span className="marquee-text">
+          EXCELLENCE GLORY KINDNESS ROYALTY&nbsp;
+        </span>
+        <span className="marquee-text">
+          EXCELLENCE GLORY KINDNESS ROYALTY&nbsp;
+        </span>
+      </div>
     </div>
   );
 }
+

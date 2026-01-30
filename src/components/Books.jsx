@@ -1,15 +1,15 @@
 import Container from "./ui/Container";
 
 const events = [
-  { title: "PITCH-DECK\nESSENTIALS", price: "€199.00", cta: "Pitch" },
-  { title: "FINANCIAL-MODEL\nPRECISION", price: "€499.00", cta: "Forecast" },
-  { title: "DECK + MODEL\nSYNERGY", price: "€699.00", cta: "Unify" },
-  { title: "STRATEGIC\nBLUEPRINT", price: "€1,499.00", cta: "Blueprint" },
+  { title: "You And The\nHolySpirit", price: "€199.00", cta: "More" },
+  { title: "FINANCIAL-MODEL\nPRECISION", price: "€499.00", cta: "More" },
+  { title: "ALL HANDS ON\nDECK", price: "€699.00", cta: "More" },
+  { title: "STRATEGIC\nBLUEPRINT", price: "€1,499.00", cta: "More" },
 ];
 
 export default function Books() {
   return (
-    <section id="packages" className="bg-white text-black">
+    <section id="books" className="bg-white text-black">
       <Container className="py-24">
         {/* SECTION TITLE */}
         <h2 className="text-[35px] font-extrabold uppercase tracking-tight">

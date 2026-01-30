@@ -1,0 +1,43 @@
+.marquee-track {
+  animation: marquee 600s linear infinite;
+}
+
+.marquee-text {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  line-height: 1;
+  font-size: 22vw;
+  color: white;
+}
+
+@media (min-width: 640px) {
+  .marquee-text {
+    font-size: 20vw;
+  }
+}
+
+@media (min-width: 768px) {
+  .marquee-text {
+    font-size: 18vw;
+  }
+}
+
+@media (min-width: 1024px) {
+  .marquee-text {
+    font-size: 25vw;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track:hover {
+  animation-play-state: paused;
+}
