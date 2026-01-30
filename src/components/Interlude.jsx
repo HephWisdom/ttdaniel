@@ -1,8 +1,6 @@
 import Container from "./ui/Container";
 
-const ASSETS = {
-  portrait: "../assets/tt daniel.jpeg",
-};
+import portrait from "../assets/tt daniel.jpeg"
 
 export default function AboutInterludeExact() {
   return (
@@ -64,7 +62,7 @@ export default function AboutInterludeExact() {
               <div className="relative overflow-hidden bg-zinc-900 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
                 <div className="h-[420px] sm:h-[520px] md:h-[700px] lg:h-[950px]">
                   <img
-                    src={ASSETS.portrait}
+                    src={portrait}
                     alt="Portrait"
                     className="
                       w-full h-full

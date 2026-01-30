@@ -1,13 +1,13 @@
 import Container from "./ui/Container";
 import Button from "./ui/Button";
+import toiImage from "../assets/bird.png";
 
 const ASSETS = {
   gradientBg:
     "https://images.squarespace-cdn.com/content/v1/63b7280f1480f03182fa6b95/34057b75-9832-4b08-903a-6f156bbcd605/shutterstock_593374547_Gradient.png",
   mountain:
     "https://images.squarespace-cdn.com/content/v1/63b7280f1480f03182fa6b95/2298fa28-5f3a-4142-b7bf-a688bcf45415/Singularity_Mountain",
-  toiImage:
-    "/assets/bird.png",
+ 
 };
 
 export default function Hero() {
@@ -86,7 +86,7 @@ export default function Hero() {
           {/* 🕊️ BIRD IMAGE — CENTERED, BACKGROUND REMOVED, IN FRONT */}
           <div className="pointer-events-none absolute z-50 bottom-32 left-1/2 -translate-x-1/2">
             <img
-              src={ASSETS.toiImage}
+              src={toiImage}
               alt="Bird"
               className="
                 bird-clean
