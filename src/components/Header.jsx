@@ -4,10 +4,9 @@ import Button from "./ui/Button";
 
 const nav = [
   { href: "#about", label: "About" },
-  { href: "#packages", label: "Packages" },
-  { href: "#process", label: "Process" },
-  { href: "#faq", label: "FAQ" },
-  { href: "#quote", label: "Quote" },
+  { href: "#books", label: "Books" },
+  { href: "#events", label: "Events" },
+  { href: "#counselling", label: "Counselling" },
 ];
 
 export default function Header() {
@@ -67,7 +66,7 @@ export default function Header() {
               as="a"
               href="#packages"
               variant="ghost"
-              className="py-2 text-white border-white/20 hover:bg-white/10"
+              className="py-2 text-black border-white/20 hover:bg-white/10"
             >
               Cart (0)
             </Button>

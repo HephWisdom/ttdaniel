@@ -7,7 +7,7 @@ const ASSETS = {
   mountain:
     "https://images.squarespace-cdn.com/content/v1/63b7280f1480f03182fa6b95/2298fa28-5f3a-4142-b7bf-a688bcf45415/Singularity_Mountain",
   toiImage:
-    "/src/assets/bird.png",
+    "/assets/bird.png",
 };
 
 export default function Hero() {
