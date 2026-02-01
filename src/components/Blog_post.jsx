@@ -8,9 +8,9 @@ const steps = [
   { n: "04", t: "Deliver investor-ready", d: "You receive clean deliverables and guidance for presenting confidently." },
 ];
 
-export default function Process() {
+export default function Blog_post() {
   return (
-    <section id="process" className="relative overflow-hidden">
+    <section id="blog_post" className="relative overflow-hidden">
       {/* Continue the same background language */}
       <div
         className="absolute inset-0 bg-gradient-to-br from-zinc-50 via-white to-zinc-100

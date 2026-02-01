@@ -5,6 +5,8 @@ const nav = [
   { href: "#books", label: "Books" },
   { href: "#events", label: "Events" },
   { href: "#counselling", label: "Counselling" },
+  // { href: "#bible_studies", label: "Bible-Studies" },
+  // { href: "#blog_post", label: "Blog" },
 ];
 
 export default function Header() {

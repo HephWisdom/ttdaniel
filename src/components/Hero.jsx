@@ -1,6 +1,5 @@
 import Container from "./ui/Container";
-import Button from "./ui/Button";
-import toiImage from "../assets/bird.png";
+import toiImage from "../assets/hero-ttdaniel.png";
 
 const ASSETS = {
   gradientBg:
@@ -23,6 +22,11 @@ export default function Hero() {
         .bird-clean {
           filter: grayscale(100%) contrast(1.25) brightness(1.1);
           mix-blend-mode: luminosity;
+          transition: filter 300ms ease, mix-blend-mode 300ms ease;
+        }
+        .hero-bird:hover .bird-clean {
+          filter: none;
+          mix-blend-mode: normal;
         }
       `}</style>
 
@@ -82,19 +86,17 @@ export default function Hero() {
           {/* optional bottom fade */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent" />
 
-          {/* 🕊️ BIRD IMAGE — CENTERED, BACKGROUND REMOVED, IN FRONT */}
-          <div className="pointer-events-none absolute z-50 bottom-32 left-1/2 -translate-x-1/2">
+          {/* 🕊️ HERO IMAGE — HUGE, BOTTOM CENTER */}
+          <div className="hero-bird absolute z-50 bottom-0 left-1/2 -translate-x-1/2">
             <img
               src={toiImage}
               alt="Bird"
               className="
                 bird-clean
                 -scale-x-100
-                scale-125 sm:scale-110
-                w-full max-w-md
-                sm:max-w-lg
-                md:max-w-xl
-                lg:max-w-2xl
+                w-[98vw] sm:w-[94vw] md:w-[78vw]
+                max-w-none
+                h-auto max-h-[70vh] sm:max-h-[75vh] object-contain
                 drop-shadow-2xl
               "
               style={{
@@ -126,4 +128,3 @@ function MarqueeText() {
     </div>
   );
 }
-

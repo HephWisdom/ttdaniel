@@ -4,6 +4,8 @@ import Interlude from "./components/Interlude";
 import Books from "./components/Books";
 import Events from "./components/Events";
 import Counselling from "./components/Counselling";
+import Bible_studies from "./components/Bible_studies";
+import Blog_post from "./components/Blog_post";
 import Footer from "./components/Footer";
 
 export default function App() {
@@ -16,6 +18,8 @@ export default function App() {
         <Books />
         <Events />
         <Counselling/>
+        {/* <Bible_studies/> */}
+        {/* <Blog_post/> */}
       </main>
       <Footer />
     </div>

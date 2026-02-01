@@ -30,8 +30,8 @@ export default function AboutInterludeExact() {
 
           {/* LEFT COLUMN */}
           <div className="md:col-span-6">
-            <h2 className="text-6xl font-extrabold tracking-tight md:text-7xl">
-              TT DANIEL
+            <h2 className="text-3xl font-extrabold tracking-tight md:text-4xl">
+              TT DANIEL - THE REVIVALIST
             </h2>
 
             <ul className="mt-8 max-w-md list-disc space-y-5 pl-5 text-sm leading-relaxed text-white/80">
@@ -86,12 +86,14 @@ export default function AboutInterludeExact() {
                       mb-10 sm:mb-12 md:mb-14 lg:mb-16
                     "
                   >
-                    <p className="text-2xl sm:text-3xl md:text-5xl lg:text-6xl font-extrabold leading-none tracking-tight">
-                      FATHER
+                    <p className="text-2xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold leading-none tracking-tight">
+                      APOSTLE
                       <br /><br />
-                      PRIEST
+                      AUTHOR
                       <br /><br />
                       KING
+                      <br /><br />
+                      LIFE COACH
                     </p>
                   </div>
                 </div>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Container from "./ui/Container";
 import progfeb from "../assets/26feb.jpeg";
 
@@ -9,8 +10,7 @@ const events = [
     venue: "Online (Zoom)",
     desc: "A curated evening of art, conversation, and community.",
     img: progfeb,
-    moreHref: "#",
-    registerHref: "#",
+    registerHref: "https://docs.google.com/forms/d/e/1FAIpQLScq-RMZqAfAWAYKQFJ4NPxPA9_10-faI_XswLP4TyP1raHLvw/viewform?usp=publish-editor",
   },
   {
     title: "(Session Two) Open Door Prayer and Prophetic Expo February 2026",
@@ -19,12 +19,14 @@ const events = [
     venue: "Online (Zoom)",
     desc: "A curated evening of art, conversation, and community.",
     img: progfeb,
-    moreHref: "#",
-    registerHref: "#",
+    registerHref: "https://buy.stripe.com/test_aFabJ14vaecj5Jz2KHao800",
   },
 ];
 
 export default function Events() {
+  const [activeFormUrl, setActiveFormUrl] = useState("");
+  const isModalOpen = Boolean(activeFormUrl);
+
   return (
     <section
       id="events"
@@ -50,6 +52,39 @@ export default function Events() {
       </div>
 
       <Container className="relative py-14 md:py-20">
+        {isModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Event registration form"
+            onClick={() => setActiveFormUrl("")}
+          >
+            <div
+              className="relative w-full max-w-3xl overflow-hidden rounded-lg border border-white/20 bg-black"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                className="absolute right-3 top-3 z-10 rounded-full border border-white/30 bg-black/70 px-3 py-1 text-xs font-semibold text-white hover:bg-white hover:text-black transition"
+                onClick={() => setActiveFormUrl("")}
+                aria-label="Close registration form"
+              >
+                Close
+              </button>
+
+              <div className="h-[80vh] w-full max-h-[820px] md:h-[85vh]">
+                <iframe
+                  title="Registration form"
+                  src={activeFormUrl}
+                  className="h-full w-full"
+                  frameBorder="0"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="max-w-2xl">
           <h2 className="text-3xl font-extrabold tracking-tight md:text-5xl">
             Events
@@ -108,17 +143,15 @@ export default function Events() {
                       {e.desc}
                     </p>
 
-                    <div className="mt-4 flex gap-3">
-                      <a
-                        href={e.moreHref}
-                        className="inline-flex w-full items-center justify-center border border-black/20 bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-500 hover:text-white transition"
-                      >
-                        More
-                      </a>
-
+                    <div className="mt-4 flex justify-center">
                       <a
                         href={e.registerHref}
-                        className="inline-flex w-full items-center justify-center border border-black bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 hover:text-black transition"
+                        onClick={(event) => {
+                          if (e.price !== "FREE") return;
+                          event.preventDefault();
+                          setActiveFormUrl(e.registerHref);
+                        }}
+                        className="inline-flex items-center justify-center border border-black bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 hover:text-black transition"
                       >
                         Register
                       </a>
