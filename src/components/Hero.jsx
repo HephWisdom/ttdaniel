@@ -1,5 +1,6 @@
+import { Link } from "react-router-dom";
 import Container from "./ui/Container";
-import toiImage from "../assets/hero-ttdaniel.png";
+import toiImage from "../assets/hero-image2.png";
 
 const ASSETS = {
   gradientBg:
@@ -16,6 +17,10 @@ export default function Hero() {
         @keyframes marquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
+        }
+        @keyframes floatGlow {
+          0%, 100% { transform: translateY(0); box-shadow: 0 0 18px rgba(255,140,0,0.55), 0 0 48px rgba(255,140,0,0.45); }
+          50% { transform: translateY(-6px); box-shadow: 0 0 26px rgba(255,140,0,0.75), 0 0 70px rgba(255,140,0,0.6); }
         }
 
         /* Cleaner "blue background removal" for the bird (best-effort CSS) */
@@ -37,6 +42,25 @@ export default function Hero() {
         aria-hidden="true"
       />
       <div className="absolute inset-0 bg-black/10" aria-hidden="true" />
+
+      {/* Floating CTA */}
+      <Link
+        to="/event-details"
+        className="
+          fixed z-[60] top-20 right-10 -translate-y-1/2
+          inline-flex items-center justify-center
+          h-12 px-5
+          rounded-full
+          bg-orange-500 text-white
+          font-bold uppercase tracking-wide
+          border border-orange-300/60
+          transition-transform hover:scale-[1.03] active:scale-[0.98]
+        "
+        style={{ animation: "floatGlow 2.6s ease-in-out infinite" }}
+        aria-label="Go to event details"
+      >
+        Event Details
+      </Link>
 
       {/* Marquee text BEHIND the mountain */}
       <div className="absolute inset-x-0 top-[30%] -translate-y-1/2 z-10">
@@ -87,7 +111,12 @@ export default function Hero() {
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent" />
 
           {/* 🕊️ HERO IMAGE — HUGE, BOTTOM CENTER */}
-          <div className="hero-bird absolute z-50 bottom-0 left-1/2 -translate-x-1/2">
+          <Link
+            to="/gallery"
+            className="hero-bird absolute z-50 bottom-0 left-1/2 -translate-x-1/2 block"
+            aria-label="Open image gallery"
+            title="View gallery"
+          >
             <img
               src={toiImage}
               alt="Bird"
@@ -107,7 +136,7 @@ export default function Hero() {
               }}
               loading="lazy"
             />
-          </div>
+          </Link>
         </div>
       </div>
     </section>
@@ -119,10 +148,10 @@ function MarqueeText() {
     <div className="relative overflow-hidden w-full">
       <div className="marquee-track flex w-max">
         <span className="marquee-text">
-          EXCELLENCE GLORY KINDNESS ROYALTY&nbsp;
+          GOD IS STILL MAKING PEOPLE!&nbsp;
         </span>
         <span className="marquee-text">
-          EXCELLENCE GLORY KINDNESS ROYALTY&nbsp;
+           GOD IS STILL MAKING PEOPLE!&nbsp;
         </span>
       </div>
     </div>

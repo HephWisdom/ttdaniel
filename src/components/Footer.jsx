@@ -35,8 +35,10 @@ export default function Footer() {
 
           {/* SMALL PRINT */}
           <div className="mt-16 space-y-1 text-[11px] uppercase tracking-wide text-white/60">
-            <p className="text-white">TT Daniel</p>
-            <p className="text-white">"God Is Making People!"</p>
+            <p className="text-white normal-case">
+              TT Daniel - <em className="italic font-serif">The Revivalist</em>
+            </p>
+            <p className="text-white">"God Is Still Making People!"</p>
           </div>
         </div>
       </Container>

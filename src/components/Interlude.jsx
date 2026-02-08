@@ -31,21 +31,40 @@ export default function AboutInterludeExact() {
           {/* LEFT COLUMN */}
           <div className="md:col-span-6">
             <h2 className="text-3xl font-extrabold tracking-tight md:text-4xl">
-              TT DANIEL - THE REVIVALIST
+              TT Daniel - <em className="italic font-serif">The Revivalist</em>
             </h2>
 
             <ul className="mt-8 max-w-md list-disc space-y-5 pl-5 text-sm leading-relaxed text-white/80">
-              <li>Crafting clarity from complexity, we guide capital toward purpose.</li>
               <li>
-                From incisive business plans and investor-ready decks to precision
-                financial models and fractional CFO stewardship, TT Daneil turns
-                ambition into measured impact.
+                TT Daniel is a vsionary faith-based leader, strategic organizer, a life coach with experience founding and leading organizations, training high-performing teams, individuals and executing large-scale community programs while driving operational excellence and stakeholder engagement.
+
               </li>
               <li>
-                We stand where decisive finance meets quiet kindness—illuminating
-                pathways for ventures that aspire to profit and uplift in equal
-                measure.
+               Recognized for designing and implementing impactful ministry initiatives, nonprofit organizations coaching emerging leaders, and expanding indovudual and congregational reach through strategic vision and inclusive engagement. 
+
               </li>
+              <li>
+         Proficient in overseeing administrative operations, optimizing revenue streams, and executing policies that enhance organizational efficiency and compliance. 
+
+              </li>
+              <li>
+Passionate about fostering cross-cultural collaborations, mediating conflicts, and delivering inspirational speeches to diverse audiences. 
+
+              </li>
+              <li>
+Well-versed in data-driven & intuitive decision-making, corporate training, and program development that aligns with mission-driven objectives. 
+
+              </li>
+              <li>
+                Track record of helping launch successful community events, securing stakeholder buy-in, and managing multi-faceted projects with measurable outcomes.
+
+              </li>
+
+
+
+
+
+
             </ul>
           </div>
 
@@ -59,22 +78,24 @@ export default function AboutInterludeExact() {
                 pr-[clamp(80px,8vw,80px)]
               "
             >
-              <div className="relative overflow-hidden bg-zinc-900 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
-                <div className="h-[420px] sm:h-[520px] md:h-[700px] lg:h-[950px]">
-                  <img
-                    src={portrait}
-                    alt="Portrait"
-                    className="
-                      w-full h-full
-                      object-cover object-top
-                      grayscale
-                      contrast-125
-                      brightness-95
-                      hover:grayscale-0
-                      transition duration-700
-                    "
-                    loading="lazy"
-                  />
+              <div className="relative bg-zinc-900 shadow-[0_30px_80px_rgba(0,0,0,0.55)]">
+                <div className="overflow-hidden">
+                  <div className="h-[420px] sm:h-[520px] md:h-[700px] lg:h-[950px]">
+                    <img
+                      src={portrait}
+                      alt="Portrait"
+                      className="
+                        w-full h-full
+                        object-cover object-top
+                        grayscale
+                        contrast-125
+                        brightness-95
+                        hover:grayscale-0
+                        transition duration-700
+                      "
+                      loading="lazy"
+                    />
+                  </div>
                 </div>
 
                 {/* MANTRA — face-safe, bottom anchored */}
@@ -84,6 +105,7 @@ export default function AboutInterludeExact() {
                       bg-white text-black shadow-[0_30px_90px_rgba(0,0,0,0.55)]
                       px-4 py-4 sm:px-6 sm:py-6 md:px-10 md:py-8
                       mb-10 sm:mb-12 md:mb-14 lg:mb-16
+                      md:-translate-x-full
                     "
                   >
                     <p className="text-2xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold leading-none tracking-tight">
