@@ -1,4 +1,5 @@
 import Container from "./ui/Container";
+import { Link } from "react-router-dom";
 
 import portrait from "../assets/tt daniel.jpeg"
 
@@ -40,7 +41,7 @@ export default function AboutInterludeExact() {
 
               </li>
               <li>
-               Recognized for designing and implementing impactful ministry initiatives, nonprofit organizations coaching emerging leaders, and expanding indovudual and congregational reach through strategic vision and inclusive engagement. 
+               Recognized for designing and implementing impactful ministry initiatives, nonprofit organizations, coaching emerging leaders, and expanding individual and congregational reach through strategic vision and inclusive engagement. 
 
               </li>
               <li>
@@ -66,6 +67,16 @@ Well-versed in data-driven & intuitive decision-making, corporate training, and 
 
 
             </ul>
+
+            <div className="mt-8">
+              <Link
+                to="/interlude-read-more"
+                className="inline-flex items-center gap-2 border border-[#d3b57f]/55 bg-white/[0.03] px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#f2ddad] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#e6c98a] hover:bg-[#e6c98a]/12 hover:text-[#fff4d7]"
+              >
+                Read More
+                <span aria-hidden="true">→</span>
+              </Link>
+            </div>
           </div>
 
           {/* RIGHT COLUMN (portrait + mantra) */}

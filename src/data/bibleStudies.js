@@ -1,35 +1,36 @@
-import opendoor1 from "../assets/opendoor1.webp";
-import opendoor2 from "../assets/opendoor2.webp";
-import feb26 from "../assets/26feb.webp";
+import warfareWelfareFlyer from "../assets/warfare-welfare.jpeg";
+import opendoor2 from "../assets/salvation.png";
+import feb26 from "../assets/news.png";
 
 export const bibleStudies = [
   {
     key: "pray-together",
-    title: "Pray Together",
+    title: "WARFARE FOR WELFARE",
     groups: "24 groups subscribed",
-    image: opendoor1,
-    summary:
-      "A prayer-focused community study for building consistency, faith, and mutual support.",
+    image: warfareWelfareFlyer,
+    summary: "Weekly Wednesday Prayers",
     details:
-      "This study helps participants build a practical prayer rhythm, learn how to pray with Scripture, and support each other through focused weekly prayer points. Sessions include short teaching, guided prayer moments, and testimonies from group members.",
+      "This meeting helps participants build a practical prayer rhythm, learn how to pray with Scripture, and support each other through focused weekly prayer points. Sessions include short teaching, guided prayer moments, and testimonies from group members.",
+    schedule: "6:00 PM Central Time (Please convert to your local time)",
+    zoomUrl:
+      "https://us06web.zoom.us/j/6517935609?pwd=NMlOlCOJ9eitIMpn0nGRwGfP0p11Ev.1",
   },
   {
     key: "salvation-army",
-    title: "Salvation Army: Standing Together",
+    title: "Soteriology",
     groups: "4 groups subscribed",
     image: opendoor2,
-    summary:
-      "A study on standing firm in faith, unity, and Christian identity in everyday life.",
+    summary: "Heaven Mindedness",
     details:
       "This track focuses on spiritual discipline, conviction, and community. Participants explore what it means to stand for Christ in family, work, and society while staying rooted in grace and truth. Each session ends with reflection questions and practical action steps.",
   },
   {
-    key: "church-news",
-    title: "Church News",
+    key: "bible-studies",
+    title: "BIBLE STUDIES",
     groups: "18 groups subscribed",
     image: feb26,
     summary:
-      "Weekly updates and themed Bible reflections connected to ministry direction.",
+      "Weekly study on themed Biblical reflections connected to ministry and practical christian living.",
     details:
       "Church News brings together important ministry updates and Bible-based teaching for the current season. It is designed to keep everyone aligned with church vision, ongoing projects, and special prayer burdens while growing deeper in the Word together.",
   },

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Container from "./ui/Container";
 
 function FacebookIcon({ className = "" }) {
@@ -13,7 +13,7 @@ function FacebookIcon({ className = "" }) {
 function WhatsAppIcon({ className = "" }) {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
-      <path d="M20.5 3.5A11.2 11.2 0 0 0 2.8 17.1L1.5 22.5l5.5-1.3A11.2 11.2 0 1 0 20.5 3.5ZM12 21a9 9 0 0 1-4.6-1.3l-.3-.2-3.2.8.8-3.1-.2-.3a9 9 0 1 1 7.5 4.1Zm5-6.7c-.3-.2-1.8-.9-2.1-1-.3-.1-.5-.2-.7.2l-.6.9c-.2.2-.3.2-.6.1a7.3 7.3 0 0 1-3.6-3.2c-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.6l-.9-2c-.2-.4-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.4a2.9 2.9 0 0 0-.9 2.2c0 1.3.9 2.5 1 2.6.2.2 1.9 2.9 4.7 4 .7.4 1.3.6 1.8.7.8.3 1.5.2 2.1.1.6-.1 1.8-.7 2.1-1.4.2-.6.2-1.2.1-1.3-.1-.1-.3-.2-.6-.4Z" />
+      <path d="M12 2.3A9.7 9.7 0 0 0 3.6 16.8L2 22l5.4-1.5A9.7 9.7 0 1 0 12 2.3Zm0 17.4a7.7 7.7 0 0 1-3.9-1.1l-.3-.2-2.7.8.8-2.6-.2-.3A7.7 7.7 0 1 1 12 19.7Zm4.2-5.8c-.2-.1-1.3-.7-1.5-.8-.2-.1-.4-.1-.5.1l-.4.6c-.1.2-.2.2-.4.1a6.3 6.3 0 0 1-3.1-2.7c-.1-.2 0-.3.1-.4l.3-.4c.1-.1.1-.3.2-.4.1-.1 0-.3 0-.4l-.7-1.5c-.1-.3-.3-.3-.4-.3h-.4c-.2 0-.4.1-.5.2-.2.2-.7.7-.7 1.8s.7 2 1 2.2c.2.2 1.5 2.4 3.7 3.2.5.2 1 .4 1.4.5.6.2 1.2.2 1.6.1.5-.1 1.3-.5 1.5-1.1.2-.5.2-1 .1-1.1-.1-.1-.3-.2-.5-.3Z" />
     </svg>
   );
 }
@@ -30,16 +30,19 @@ const nav = [
   { href: "#books", label: "Books" },
   { href: "#events", label: "Events" },
   { href: "#counselling", label: "Counselling" },
-  { href: "#bible_studies", label: "Bible studies" },
-  // { href: "#blog_post", label: "Blog" },
+  { href: "#spirituality", label: "Spirituality" },
+  { href: "#blog", label: "Blog" },
 ];
+
+const DONATE_LINK =
+  import.meta.env.VITE_DONATE_LINK || "https://buy.stripe.com/14AfZh9Pu2tBeg51GDao804";
 
 const socialLinks = [
   {
     key: "facebook",
     label: "Facebook",
     handle: "@ttdanielplus",
-    href: "https://facebook.com/ttdanielplus",
+    href: "https://www.facebook.com/dtsokpor/",
     Icon: FacebookIcon,
     desktopClass:
       "border-white/25 bg-white/5 text-white/80 hover:border-[#1877F2]/70 hover:bg-[#1877F2]/35 hover:text-[#d3e9ff] hover:shadow-[0_0_18px_rgba(24,119,242,0.55)]",
@@ -50,7 +53,7 @@ const socialLinks = [
     key: "whatsapp",
     label: "WhatsApp",
     handle: "Chat on WhatsApp",
-    href: "https://wa.me/?text=Hello%20TT%20Daniel",
+    href: "https://wa.me/17634854409",
     Icon: WhatsAppIcon,
     desktopClass:
       "border-white/25 bg-white/5 text-white/80 hover:border-[#25D366]/70 hover:bg-[#25D366]/35 hover:text-[#d8ffe7] hover:shadow-[0_0_18px_rgba(37,211,102,0.55)]",
@@ -61,7 +64,7 @@ const socialLinks = [
     key: "instagram",
     label: "Instagram",
     handle: "@ttdanielplus",
-    href: "https://instagram.com/ttdanielplus",
+    href: "https://www.instagram.com/pleasantarians/reels/?hl=en",
     Icon: InstagramIcon,
     desktopClass:
       "border-white/25 bg-white/5 text-white/80 hover:border-[#E1306C]/70 hover:bg-[#E1306C]/35 hover:text-[#ffd6e5] hover:shadow-[0_0_18px_rgba(225,48,108,0.55)]",
@@ -75,7 +78,7 @@ export default function Header() {
   const mobileDialogRef = useRef(null);
   const location = useLocation();
   const isHome = location.pathname === "/";
-  const buildHref = (href) => (isHome ? href : `/${href}`);
+  const buildTo = (href) => (isHome ? href : `/${href}`);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -118,22 +121,31 @@ export default function Header() {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 bg-black">
+    <header className="sticky top-0 z-50 bg-black backdrop-blur-xl">
       <Container>
-        <div className="relative flex h-16 items-center justify-between">
+        <div className="relative flex h-16 items-center justify-between lg:h-[74px]">
+          {/* Brand → scroll to top */}
+          <Link
+            to={buildTo("#top")}
+            className="text-sm font-bold tracking-[0.3em] uppercase text-[#f7e5bf] lg:text-[13px]"
+          >
+            TT Daniel
+          </Link>
+
           {/* Mobile-only Menu button ( + / X ) */}
           <button
             onClick={() => setOpen((v) => !v)}
             className="
-              inline-flex md:hidden
+              inline-flex lg:hidden
               items-center justify-center
               h-10 w-10
               rounded-full
-              border border-white/20
-              bg-black
-              text-white
-              hover:bg-white/10
-              transition
+              border border-[#c7a468]/35
+              bg-[#141210]
+              text-[#f5e4c2]
+              shadow-[0_10px_24px_-12px_rgba(0,0,0,0.8)]
+              hover:border-[#d9b271]/55 hover:bg-[#1c1814]
+              transition-all
             "
             aria-expanded={open}
             aria-label={open ? "Close menu" : "Open menu"}
@@ -150,16 +162,8 @@ export default function Header() {
             </span>
           </button>
 
-          {/* Brand → scroll to top */}
-          <a
-            href={buildHref("#top")}
-            className="text-sm font-semibold tracking-[0.28em] uppercase text-white"
-          >
-            TT Daniel
-          </a>
-
-          {/* Desktop social (centered) */}
-          <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-3 md:flex">
+          {/* Desktop social */}
+          <div className="ml-4 hidden items-center gap-2 lg:flex xl:gap-3">
             {socialLinks.map((item) => (
               <a
                 key={item.key}
@@ -167,7 +171,7 @@ export default function Header() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={item.label}
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-300 hover:-translate-y-0.5 ${item.desktopClass}`}
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d3b57f]/35 bg-white/[0.04] transition-all duration-300 hover:-translate-y-0.5 ${item.desktopClass}`}
               >
                 <item.Icon className="h-4 w-4" />
                 <span className="sr-only">{item.label}</span>
@@ -176,29 +180,37 @@ export default function Header() {
           </div>
 
           {/* Desktop nav */}
-          <nav className="hidden items-center gap-4 md:flex">
+          <nav className="ml-auto hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1 lg:flex xl:gap-2 xl:p-1.5">
             {nav.map((item) => (
-              <a
+              <Link
                 key={item.href}
-                href={buildHref(item.href)}
-                className="text-sm text-white/70 hover:text-white transition"
+                to={buildTo(item.href)}
+                className="rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-white/10 hover:text-white xl:px-4 xl:text-xs xl:tracking-[0.16em]"
               >
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
+          <a
+            href={DONATE_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-3 hidden h-10 items-center justify-center rounded-full border border-[#d3b57f]/70 bg-[#f1d49e] px-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#22170d] transition-colors duration-200 hover:bg-[#22170d] hover:text-[#f1d49e] lg:inline-flex"
+          >
+            Donate
+          </a>
         </div>
 
         {/* Mobile menu */}
         {open && (
-          <div className="md:hidden">
+          <div className="lg:hidden">
             <div
               className="fixed inset-0 z-40 bg-black/70"
               onClick={() => setOpen(false)}
             />
             <div
               id="mobile-navigation-menu"
-              className="fixed inset-x-4 top-20 z-50 rounded-3xl border border-white/10 bg-black p-4 shadow-xl"
+              className="fixed inset-x-4 top-20 z-50 rounded-3xl border border-[#d3b57f]/25 bg-[linear-gradient(180deg,rgba(16,14,12,0.98)_0%,rgba(8,8,8,0.98)_100%)] p-4 shadow-[0_30px_80px_-35px_rgba(0,0,0,0.9)]"
               role="dialog"
               aria-modal="true"
               aria-label="Mobile navigation"
@@ -207,24 +219,33 @@ export default function Header() {
             >
               <nav className="grid gap-2">
                 {nav.map((item) => (
-                  <a
+                  <Link
                     key={item.href}
-                    href={buildHref(item.href)}
+                    to={buildTo(item.href)}
                     onClick={() => setOpen(false)}
-                    className="rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10 transition"
+                    className="rounded-2xl border border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-white hover:border-white/40 hover:bg-white/10 transition"
                   >
                     {item.label}
-                  </a>
+                  </Link>
                 ))}
+                <a
+                  href={DONATE_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="rounded-2xl border border-[#d3b57f]/60 bg-[#f1d49e] px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.14em] text-[#22170d] transition-colors duration-200 hover:bg-[#22170d] hover:text-[#f1d49e]"
+                >
+                  Donate
+                </a>
 
                 <div className="mt-2 border-t border-white/10 pt-3">
-                  <a
-                    href={buildHref("#top")}
+                  <Link
+                    to={buildTo("#top")}
                     onClick={() => setOpen(false)}
-                    className="block rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10"
+                    className="block rounded-2xl border border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-white hover:border-white/40 hover:bg-white/10"
                   >
                     Back to top
-                  </a>
+                  </Link>
                 </div>
 
                 <div className="mt-2 border-t border-white/10 pt-3">
@@ -234,7 +255,7 @@ export default function Header() {
                       href={item.href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-white hover:bg-white/10 transition ${item.mobileRowClass}`}
+                      className={`group flex items-center gap-3 rounded-2xl border border-white/10 px-4 py-3 text-sm text-white hover:border-[#d3b57f]/35 hover:bg-[#f1d49e]/10 transition ${item.mobileRowClass}`}
                     >
                       <item.Icon className={`h-4 w-4 ${item.mobileIconClass}`} />
                       {item.label}: <span className="text-white/70">{item.handle}</span>

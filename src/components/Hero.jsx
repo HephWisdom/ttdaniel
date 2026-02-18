@@ -1,159 +1,174 @@
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 import Container from "./ui/Container";
-import toiImage from "../assets/hero-image2.png";
+import mainPortrait from "../assets/ttdaniel1.png";
+import thumbOne from "../assets/gallery/IMG-20260208-WA0015.jpg";
+import thumbTwo from "../assets/gallery/IMG-20260208-WA0030.jpg";
+import thumbThree from "../assets/gallery/IMG-20260208-WA0028.jpg";
+import thumbFour from "../assets/gallery/IMG-20260208-WA0027.jpg";
+import thumbFive from "../assets/gallery/IMG-20260206-WA0016.jpg";
 
-const ASSETS = {
-  gradientBg:
-    "https://images.squarespace-cdn.com/content/v1/63b7280f1480f03182fa6b95/34057b75-9832-4b08-903a-6f156bbcd605/shutterstock_593374547_Gradient.png",
-  mountain:
-    "https://images.squarespace-cdn.com/content/v1/63b7280f1480f03182fa6b95/2298fa28-5f3a-4142-b7bf-a688bcf45415/Singularity_Mountain",
- 
-};
+const THUMBNAILS = [thumbOne, thumbTwo, thumbThree, thumbFour, thumbFive];
+const HEADING_SEGMENTS = [
+  { text: "GOD" },
+  { text: "IS", breakBefore: true },
+  { text: " STILL" },
+  { text: "MAKING", breakBefore: true },
+  { text: "PEOPLE!", breakBefore: true },
+];
+const SEGMENT_BASE_INDEX = HEADING_SEGMENTS.reduce(
+  (acc, segment, index) => {
+    const previous = index === 0 ? 0 : acc[index - 1] + HEADING_SEGMENTS[index - 1].text.replaceAll(" ", "").length;
+    acc.push(previous);
+    return acc;
+  },
+  []
+);
 
 export default function Hero() {
+  const letterRefs = useRef([]);
+
+  const handleHeadingMouseMove = (event) => {
+    const influenceRadius = 120;
+    const maxShift = 4;
+
+    letterRefs.current.forEach((letter) => {
+      if (!letter) return;
+
+      const rect = letter.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const deltaX = event.clientX - centerX;
+      const deltaY = event.clientY - centerY;
+      const distance = Math.hypot(deltaX, deltaY);
+
+      if (distance > influenceRadius) {
+        letter.style.transform = "translate3d(0, 0, 0)";
+        return;
+      }
+
+      const strength = (1 - distance / influenceRadius) * 0.14;
+      const moveX = Math.max(Math.min(deltaX * strength, maxShift), -maxShift);
+      const moveY = Math.max(Math.min(deltaY * strength, maxShift), -maxShift);
+      letter.style.transform = `translate3d(${moveX}px, ${moveY}px, 0)`;
+    });
+  };
+
+  const handleHeadingMouseLeave = () => {
+    letterRefs.current.forEach((letter) => {
+      if (letter) {
+        letter.style.transform = "translate3d(0, 0, 0)";
+      }
+    });
+  };
+
   return (
-    <section className="relative overflow-hidden">
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        @keyframes floatGlow {
-          0%, 100% { transform: translateY(0); box-shadow: 0 0 18px rgba(255,140,0,0.55), 0 0 48px rgba(255,140,0,0.45); }
-          50% { transform: translateY(-6px); box-shadow: 0 0 26px rgba(255,140,0,0.75), 0 0 70px rgba(255,140,0,0.6); }
-        }
+    <section className="min-h-screen bg-[#d3d3d3]">
+      <Container className="h-full max-w-none px-0">
+        <div className="min-h-screen w-full bg-[#ececec] px-6 py-6 sm:px-10 sm:py-8 lg:px-12 lg:py-10">
+          <div className="grid items-start gap-8 lg:grid-cols-[1fr_1fr] lg:gap-4">
+            <div className="flex w-full items-start justify-center">
+            <div
+              className="mt-0 pt-2 lg:pt-4"
+              onMouseMove={handleHeadingMouseMove}
+              onMouseLeave={handleHeadingMouseLeave}
+            >
+            <h1 className="mx-auto max-w-[12ch] text-center font-serif text-[clamp(3rem,8.8vw,8.6rem)] leading-[0.8] tracking-[-0.02em] text-black">
+              {HEADING_SEGMENTS.map((segment, segmentIndex) => (
+                <span key={`${segment.text}-${segmentIndex}`}>
+                  {segment.breakBefore ? <br /> : null}
+                  <span
+                    className={`whitespace-nowrap ${segment.italic ? "italic" : ""}`}
+                  >
+                    {segment.text.split("").map((char, charIndex) => {
+                      const isSpace = char === " ";
+                      const key = `${segmentIndex}-${charIndex}`;
+                      const charsBefore = segment.text
+                        .slice(0, charIndex)
+                        .replaceAll(" ", "").length;
+                      const currentLetterIndex =
+                        SEGMENT_BASE_INDEX[segmentIndex] + charsBefore;
+                      return isSpace ? (
+                        <span key={key}> </span>
+                      ) : (
+                        <span
+                          key={key}
+                          ref={(node) => {
+                            letterRefs.current[currentLetterIndex] = node;
+                          }}
+                          className="inline-block transition-transform duration-200 ease-out"
+                        >
+                          {char}
+                        </span>
+                      );
+                    })}
+                  </span>
+                </span>
+              ))}
+            </h1>
+          </div>
+            </div>
 
-        /* Cleaner "blue background removal" for the bird (best-effort CSS) */
-        .bird-clean {
-          filter: grayscale(100%) contrast(1.25) brightness(1.1);
-          mix-blend-mode: luminosity;
-          transition: filter 300ms ease, mix-blend-mode 300ms ease;
-        }
-        .hero-bird:hover .bird-clean {
-          filter: none;
-          mix-blend-mode: normal;
-        }
-      `}</style>
+            <div className="order-last lg:order-none lg:justify-self-stretch">
+              <div className="h-[20rem] w-full max-w-[26rem] overflow-hidden bg-[#e5e5e5] sm:h-[24rem] lg:-ml-10 lg:h-[33rem] lg:w-[99%] lg:max-w-none">
+                <img
+                  src={mainPortrait}
+                  alt="Main portrait"
+                  className="h-full w-full object-cover object-center grayscale transition-all duration-1000 ease-out hover:grayscale-0"
+                  loading="eager"
+                />
+              </div>
+            </div>
+          </div>
 
-      {/* Background image */}
-      <div
-        className="absolute inset-0 bg-center bg-cover"
-        style={{ backgroundImage: `url(${ASSETS.gradientBg})` }}
-        aria-hidden="true"
-      />
-      <div className="absolute inset-0 bg-black/10" aria-hidden="true" />
 
-      {/* Floating CTA */}
-      <Link
-        to="/event-details"
-        className="
-          fixed z-[60] top-20 right-10 -translate-y-1/2
-          inline-flex items-center justify-center
-          h-12 px-5
-          rounded-full
-          bg-orange-500 text-white
-          font-bold uppercase tracking-wide
-          border border-orange-300/60
-          transition-transform hover:scale-[1.03] active:scale-[0.98]
-        "
-        style={{ animation: "floatGlow 2.6s ease-in-out infinite" }}
-        aria-label="Go to event details"
-      >
-        Event Details
-      </Link>
+          <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-end">
+            <div className="max-w-[35rem]">
+              <div className="mb-2 flex items-center justify-between text-[9px] uppercase tracking-[0.08em] text-black/60 sm:text-[10px]">
+                <span>Recent Frames</span>
+                <span className="inline-flex items-center gap-1">
+                  Swipe to Scroll
+                  <span aria-hidden="true">→</span>
+                </span>
+              </div>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#ececec] to-transparent" />
+                <div className="flex gap-3 overflow-x-auto pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-4">
+                  {THUMBNAILS.map((image) => (
+                    <Link
+                      key={image}
+                      to="/gallery"
+                      className="block basis-1/3 shrink-0 overflow-hidden bg-[#e4e4e4]"
+                      aria-label="Open gallery"
+                    >
+                  <img
+                    src={image}
+                    alt="Gallery thumbnail"
+                    className="h-28 w-full object-cover grayscale transition-all duration-1000 ease-out hover:scale-105 hover:grayscale-0 sm:h-40"
+                    loading="lazy"
+                  />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-      {/* Marquee text BEHIND the mountain */}
-      <div className="absolute inset-x-0 top-[30%] -translate-y-1/2 z-10">
-        <div className="relative overflow-hidden">
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-28 bg-gradient-to-r to-transparent" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-28 bg-gradient-to-l to-transparent" />
-
-          <div
-            className="flex w-[200%] whitespace-nowrap"
-            style={{ animation: "marquee 22s linear infinite" }}
-          >
-            <MarqueeText />
+            <div className="max-w-[22rem] justify-self-start text-[10px] uppercase leading-[1.52] tracking-[0.04em] text-black/88 lg:justify-self-end">
+              <p>
+                FOR WE ARE HIS WORKMANSHIP, CREATED IN CHRIST JESUS UNTO GOOD
+                WORKS, WHICH GOD HATH BEFORE ORDAINED THAT WE SHOULD WALK IN
+                THEM. EPHESIANS 2:10 (KJV)
+              </p>
+              <Link
+                to="/gallery"
+                className="mt-7 inline-block border-b border-black pb-[2px] text-[10px] font-semibold uppercase tracking-[0.06em]"
+              >
+                GALLERY
+              </Link>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Foreground copy (empty in your code) */}
-      <Container className="relative z-20 py-20 md:py-28">
-        <div className="max-w-3xl">{/* your text/buttons if you want */}</div>
       </Container>
-
-      {/* Mountain in FRONT — BIGGER + LEFT + blended */}
-      <div className="relative z-30 -mt-28 md:-mt-44">
-        <div className="relative w-full overflow-hidden">
-          <img
-            src={ASSETS.mountain}
-            alt="Mountain"
-            className="
-              pointer-events-none select-none
-              w-[220%] sm:w-[200%] md:w-[170%] lg:w-[150%]
-              max-w-none
-              -translate-x-[28%] sm:-translate-x-[30%] md:-translate-x-[26%] lg:-translate-x-[22%]
-              object-cover
-              brightness-[0.95] contrast-[1.05]
-            "
-            style={{
-              WebkitMaskImage:
-                "linear-gradient(to bottom, black 72%, transparent 98%)",
-              maskImage: "linear-gradient(to bottom, black 72%, transparent 98%)",
-            }}
-            loading="lazy"
-          />
-
-          {/* blend top edge into hero */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/90 to-transparent" />
-
-          {/* optional bottom fade */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white to-transparent" />
-
-          {/* 🕊️ HERO IMAGE — HUGE, BOTTOM CENTER */}
-          <Link
-            to="/gallery"
-            className="hero-bird absolute z-50 bottom-0 left-1/2 -translate-x-1/2 block"
-            aria-label="Open image gallery"
-            title="View gallery"
-          >
-            <img
-              src={toiImage}
-              alt="Bird"
-              className="
-                bird-clean
-                -scale-x-100
-                w-[98vw] sm:w-[94vw] md:w-[78vw]
-                max-w-none
-                h-auto max-h-[70vh] sm:max-h-[75vh] object-contain
-                drop-shadow-2xl
-              "
-              style={{
-                WebkitMaskImage:
-                  "radial-gradient(circle at 50% 55%, black 65%, transparent 92%)",
-                maskImage:
-                  "radial-gradient(circle at 50% 55%, black 65%, transparent 92%)",
-              }}
-              loading="lazy"
-            />
-          </Link>
-        </div>
-      </div>
     </section>
-  );
-}
-
-function MarqueeText() {
-  return (
-    <div className="relative overflow-hidden w-full">
-      <div className="marquee-track flex w-max">
-        <span className="marquee-text">
-          GOD IS STILL MAKING PEOPLE!&nbsp;
-        </span>
-        <span className="marquee-text">
-           GOD IS STILL MAKING PEOPLE!&nbsp;
-        </span>
-      </div>
-    </div>
   );
 }

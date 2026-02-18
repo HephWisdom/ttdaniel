@@ -1,10 +1,23 @@
+html {
+  scroll-behavior: auto;
+}
+
+[id] {
+  scroll-margin-top: 92px;
+}
+
+#top {
+  scroll-margin-top: 0;
+}
+
 .marquee-track {
   animation: marquee 600s linear infinite;
 }
 
 .marquee-text {
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-family: "Playfair Display", "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   line-height: 1;
   font-size: 22vw;
@@ -40,6 +53,12 @@
 
 .marquee-track:hover {
   animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 .fire-glow {
