@@ -1,15 +1,27 @@
 import Container from "./ui/Container";
 import one_on_one from "../assets/one-on-one.jpg";
 import family from "../assets/Counseling Center.png";
+import free_session from "../assets/free-session.png";
 
 export default function Counselling() {
   const cards = [
+    {
+      key: "free-intro",
+      tag: "Free Session",
+      title: "Free Counseling",
+      desc: "A free first session to understand your needs, ask questions, and plan the right next step.",
+      img: free_session,
+      cta: "Schedule Now",
+      link: "https://calendly.com/ttdanielplus/15min",
+    },
     {
       key: "individual",
       tag: "Private Session",
       title: "One‑on‑one Counseling",
       desc: "Private, focused sessions to explore personal challenges, growth and healing.",
       img: one_on_one,
+      cta: "Book Now",
+      link: "https://calendly.com/ttdanielplus/private-talk-with-tt-daniel",
     },
     {
       key: "family",
@@ -17,6 +29,8 @@ export default function Counselling() {
       title: "Family Counseling",
       desc: "Guided family sessions to improve communication, resolve conflict and create connection.",
       img: family,
+      cta: "Book Now",
+      link: "https://calendly.com/ttdanielplus/family-counseling-with-tt-daniel",
     },
   ];
 
@@ -33,7 +47,7 @@ export default function Counselling() {
 
       <Container className="py-14 md:py-20">
         <h2 className="text-[35px] font-extrabold uppercase tracking-tight text-white">
-          Counselling
+          Counseling
         </h2>
         <p className="mt-3 max-w-2xl text-md text-white/75">
           A calm and intentional space for healing, clarity, and restored direction.
@@ -68,9 +82,20 @@ export default function Counselling() {
                     {c.desc}
                   </p>
 
-                  <div className="mt-7 inline-flex w-fit items-center border border-[#d4b06f]/70 bg-black/50 px-5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d7a5]">
-                    Coming Soon
-                  </div>
+                  {c.link ? (
+                    <a
+                      href={c.link}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-7 inline-flex w-fit items-center border border-[#d4b06f]/70 bg-black/50 px-5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d7a5] transition hover:bg-[#d4b06f]/20"
+                    >
+                      {c.cta}
+                    </a>
+                  ) : (
+                    <div className="mt-7 inline-flex w-fit items-center border border-[#d4b06f]/70 bg-black/50 px-5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d7a5]">
+                      {c.cta}
+                    </div>
+                  )}
                 </div>
               </article>
             ))}

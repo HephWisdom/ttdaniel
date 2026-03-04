@@ -18,7 +18,7 @@ export const featuredEvents = [
   featuredEvent,
   {
     title: "EBA Faith Seeking Understanding Ghana Training Seminar",
-    date: "Register before 28TH FEB, 2026",
+    date: "Register before 2ND MAR, 2026",
     price: "REGISTER NOW",
     venue: "Trinity Theological Seminary, East Legon, Accra",
     desc: "Ghana, in case you have not yet seen this opportunity, you have not missed it yet. Turn to it now.",
@@ -27,7 +27,7 @@ export const featuredEvents = [
     img: ghanaTrainingSeminarPoster,
     detailsHref: "https://www.pleasantpentecostal.org/registration",
     isExternal: true,
-    deadline: "2026-02-28",
+    deadline: "2026-03-02",
   },
   {
     title: "Annual Holy Convocation (GHA) 2026",

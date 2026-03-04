@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Container from "./ui/Container";
 import { featuredEvents } from "../data/events";
@@ -22,6 +22,18 @@ function getCountdownLabel(deadline, now) {
   return `${daysLeft} days left`;
 }
 
+function isEventClosed(deadline, now) {
+  if (!deadline) return false;
+
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const deadlineDate = new Date(`${deadline}T00:00:00`);
+  deadlineDate.setHours(0, 0, 0, 0);
+
+  return deadlineDate.getTime() < today.getTime();
+}
+
 function getQrImageSrc(event) {
   if (!event?.isExternal) return null;
   if (event.qrImage) return event.qrImage;
@@ -34,6 +46,14 @@ function getQrImageSrc(event) {
 export default function Events() {
   const [now, setNow] = useState(() => Date.now());
   const [activeEvent, setActiveEvent] = useState(null);
+  const sortedFeaturedEvents = useMemo(() => {
+    return [...featuredEvents].sort((a, b) => {
+      const aClosed = isEventClosed(a.deadline, now);
+      const bClosed = isEventClosed(b.deadline, now);
+      if (aClosed === bClosed) return 0;
+      return aClosed ? 1 : -1;
+    });
+  }, [now]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -61,9 +81,11 @@ export default function Events() {
 
   const renderEventCard = (event, index) => {
     const ctaLabel = event.isExternal ? "Register now" : "View details";
+    const detailsTarget = event.isExternal ? event.detailsHref : event.detailsHref || "/event-details";
     const countdown = getCountdownLabel(event.deadline, now);
+    const closed = isEventClosed(event.deadline, now);
     const qrImageSrc = getQrImageSrc(event);
-    const isPrimaryCard = index === 0;
+    const isPrimaryCard = index === 0 && !closed;
     const clampTitle = {
       display: "-webkit-box",
       WebkitLineClamp: 2,
@@ -88,7 +110,12 @@ export default function Events() {
           hover:border-white/45 hover:shadow-[0_28px_75px_-30px_rgba(255,255,255,0.35)]
         "
         style={
-          isPrimaryCard
+          closed
+            ? {
+                filter: "grayscale(1)",
+                opacity: 0.82,
+              }
+            : isPrimaryCard
             ? {
                 borderColor: "rgba(251, 191, 36, 0.52)",
                 boxShadow:
@@ -134,7 +161,7 @@ export default function Events() {
               <p className="text-sm leading-relaxed text-white/75 normal-case" style={clampDesc}>
                 {event.desc}
               </p>
-              {event.isExternal ? (
+              {event.isExternal && !closed ? (
                 <button
                   type="button"
                   onClick={() => setActiveEvent(event)}
@@ -146,7 +173,7 @@ export default function Events() {
             </div>
           ) : null}
 
-          {qrImageSrc ? (
+          {qrImageSrc && !closed ? (
             <div className="mt-4 rounded-lg border border-white/15 bg-black/35 p-3">
               <div className="flex items-center gap-3">
                 <img
@@ -163,9 +190,13 @@ export default function Events() {
           ) : null}
 
           <div className="mt-4">
-            {event.isExternal ? (
+            {closed ? (
+              <span className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-md border border-white/20 bg-[#1a1a1a]/70 px-4 text-sm font-semibold uppercase tracking-[0.1em] text-white/60">
+                Registration closed
+              </span>
+            ) : event.isExternal ? (
               <a
-                href={event.detailsHref}
+                href={detailsTarget}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#d2b679]/45 bg-[#0f0f10]/85 px-4 text-sm font-semibold uppercase tracking-[0.1em] text-[#f0d9a6] transition hover:border-[#f0d9a6] hover:bg-[#f0d9a6] hover:text-[#111]"
@@ -174,7 +205,7 @@ export default function Events() {
               </a>
             ) : (
               <Link
-                to={event.detailsHref}
+                to={detailsTarget}
                 className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#d2b679]/45 bg-[#0f0f10]/85 px-4 text-sm font-semibold uppercase tracking-[0.1em] text-[#f0d9a6] transition hover:border-[#f0d9a6] hover:bg-[#f0d9a6] hover:text-[#111]"
               >
                 {ctaLabel}
@@ -236,7 +267,7 @@ export default function Events() {
         </div>
 
         <div className="mt-12 grid items-start gap-7 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredEvents.map((event, index) => renderEventCard(event, index))}
+          {sortedFeaturedEvents.map((event, index) => renderEventCard(event, index))}
         </div>
       </Container>
 

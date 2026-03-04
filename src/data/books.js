@@ -10,7 +10,12 @@ export const books = [
   {
     title: "ACCESS PORTALS FOR SUPERNATURAL BREAKTHROUGHS",
     price: "Buy Now!",
+    usdPrice: "Buy Now!",
+    ghsPrice: "GHS 25.00",
     image: access,
+    stripeLink: "https://buy.stripe.com/9B68wPe5K3xFb3T1GDao803",
+    paystackLink:
+      "https://paystack.com/buy/access-portals-for-supernatural-breakthroughs-xjlfsn",
     blurb:
       "Discover spiritual keys that position you for consistent supernatural breakthroughs.",
     details:
@@ -19,7 +24,11 @@ export const books = [
   {
     title: "BEFORE PRAYER",
     price: "$12.00",
+    usdPrice: "$12.00",
+    ghsPrice: "GHS 30.00",
     image: beforePrayer,
+    stripeLink: "https://buy.stripe.com/5kQ7sL9Puecj9ZPad9ao808",
+    paystackLink: "https://paystack.com/buy/before-prayer-zbabat",
     blurb:
       "Build a deeper foundation for prayer with ancient biblical patterns and insight.",
     amazon:
@@ -29,7 +38,11 @@ export const books = [
   {
     title: "CHRISTIAN HOME CULTURE",
     price: "$10.00",
+    usdPrice: "$10.00",
+    ghsPrice: "GHS 30.00",
     image: christianHomeCulture,
+    stripeLink: "https://buy.stripe.com/aFaaEXd1Gecjfk9etpao809",
+    paystackLink: "https://paystack.com/buy/christian-home-culture-yyqiif",
     blurb:
       "A practical blueprint for building a Christ-centered and peaceful family culture.",
     amazon:
@@ -39,7 +52,11 @@ export const books = [
   {
     title: "INTRODUCTION TO FAITH ENERGY",
     price: "$7.00",
+    usdPrice: "$7.00",
+    ghsPrice: "GHS 18.00",
     image: introToFaithEnergy,
+    stripeLink: "https://buy.stripe.com/9B6dR97Hmgkrdc1851ao80d",
+    paystackLink: "https://paystack.com/buy/introduction-to-faith-energy-jhpjel",
     blurb:
       "Learn how living faith releases spiritual energy and makes the impossible possible.",
     amazon:
@@ -49,7 +66,11 @@ export const books = [
   {
     title: "Courtship Companion",
     price: "$15.00",
+    usdPrice: "$15.00",
+    ghsPrice: "GHS 25.00",
     image: courtshipCompanion,
+    stripeLink: "https://buy.stripe.com/4gMeVdgdS1px3Br5WTao80c",
+    paystackLink: "https://paystack.com/buy/courtship-companion-hkrzal",
     blurb:
       "Timeless relationship counsel for intentional courtship and wise partner selection.",
     amazon: null,
@@ -58,7 +79,11 @@ export const books = [
   {
     title: "THE 40 NEW LIVES IN CHRIST",
     price: "$2.99",
+    usdPrice: "$2.99",
+    ghsPrice: "GHS 5.00",
     image: newLivesInChrist,
+    stripeLink: "https://buy.stripe.com/9B68wP8Lq4BJfk95WTao80b",
+    paystackLink: "https://paystack.com/buy/the-40-new-lives-in-christ-szcahc",
     blurb:
       "A simple discipleship guide for believers growing in their new life in Christ.",
     amazon:
@@ -68,7 +93,11 @@ export const books = [
   {
     title: "Sinful Sweets",
     price: "$6.99",
+    usdPrice: "$6.99",
+    ghsPrice: "GHS 20.00",
     image: sinfulSweets,
+    stripeLink: "https://buy.stripe.com/00w4gz0eUecj0pfgBxao80a",
+    paystackLink: "https://paystack.com/buy/sinful-sweets-fvhmbt",
     blurb:
       "A thought-provoking call to discern hidden compromises in modern Christian living.",
     amazon: null,

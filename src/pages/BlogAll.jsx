@@ -7,9 +7,10 @@ import {
   formatBlogDate,
   sortBlogPosts,
 } from "../lib/blogStore";
+import { toPlainBlogText } from "../lib/blogContent";
 
 const getExcerpt = (content = "", limit = 160) => {
-  const text = content.replace(/[#*_`>[\]()!-]/g, " ").replace(/\s+/g, " ").trim();
+  const text = toPlainBlogText(content);
   if (!text) return "Read this blog post for ministry updates and practical insights.";
   if (text.length <= limit) return text;
   return `${text.slice(0, limit).trimEnd()}...`;
@@ -22,10 +23,17 @@ const getTitle = (title = "", limit = 64) => {
   return `${value.slice(0, limit).trimEnd()}...`;
 };
 
+const buildPostUrl = (postId) => {
+  const path = `/blog/${postId}`;
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
+};
+
 export default function BlogAll() {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sharedPostId, setSharedPostId] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -54,6 +62,34 @@ export default function BlogAll() {
   }, []);
 
   const sortedPosts = useMemo(() => sortBlogPosts(posts), [posts]);
+
+  const handleShareLink = async (postId, postTitle) => {
+    const postUrl = buildPostUrl(postId);
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: postTitle || "Blog post", url: postUrl });
+        setSharedPostId(String(postId));
+        window.setTimeout(() => setSharedPostId(""), 1800);
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(postUrl);
+      } else {
+        const fallbackInput = document.createElement("input");
+        fallbackInput.value = postUrl;
+        document.body.appendChild(fallbackInput);
+        fallbackInput.select();
+        document.execCommand("copy");
+        fallbackInput.remove();
+      }
+      setSharedPostId(String(postId));
+      window.setTimeout(() => setSharedPostId(""), 1800);
+    } catch {
+      window.open(postUrl, "_blank", "noopener,noreferrer");
+    }
+  };
 
   return (
     <section className="min-h-screen bg-[#ebebeb] text-[#0d1117]">
@@ -98,13 +134,22 @@ export default function BlogAll() {
                         {getTitle(post.title)}
                       </h2>
                       <p className="mt-3 text-sm leading-relaxed text-black/70">{getExcerpt(post.content)}</p>
-                      <Link
-                        to={`/blog/${post.id}`}
-                        className="mt-5 inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.1em] text-[#111827] transition hover:gap-3"
-                      >
-                        Read Blog Post
-                        <span aria-hidden="true">→</span>
-                      </Link>
+                      <div className="mt-5 flex items-center gap-3">
+                        <Link
+                          to={`/blog/${post.id}`}
+                          className="inline-flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.1em] text-[#111827] transition hover:gap-3"
+                        >
+                          Read Blog Post
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleShareLink(post.id, post.title)}
+                          className="inline-flex h-8 items-center justify-center rounded-full border border-black/20 px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-[#111827] transition hover:bg-[#111827] hover:text-white"
+                        >
+                          {sharedPostId === String(post.id) ? "Shared" : "Share Link"}
+                        </button>
+                      </div>
                     </div>
                   </article>
                 ))}

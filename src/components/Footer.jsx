@@ -1,5 +1,11 @@
 import Container from "./ui/Container";
 
+const footerEmails = [
+  "ttdanielplus@gmail.com",
+  "talktottdaniel@ttdaniel525.live",
+  "events.bookings@ttdaniel525.live",
+];
+
 export default function Footer() {
   return (
     <footer className="bg-black text-white overflow-hidden">
@@ -16,7 +22,6 @@ export default function Footer() {
 
       <Container className="py-24 md:py-32">
         <div className="flex flex-col items-center text-center">
-
           {/* MOVING LINE — EXTREMELY BIG */}
           <div className="relative mt-16 w-full overflow-hidden">
             {/* edge fades */}
@@ -33,10 +38,27 @@ export default function Footer() {
             </div>
           </div>
 
+          <div className="mt-8 w-full pt-6">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#f1d49e]">
+              Contact Us
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-sm">
+              {footerEmails.map((email) => (
+                <a
+                  key={email}
+                  href={`mailto:${email}`}
+                  className="rounded-full border border-white/25 px-4 py-2 text-white/90 transition-colors duration-200 hover:border-[#f1d49e]/60 hover:text-[#f1d49e]"
+                >
+                  {email}
+                </a>
+              ))}
+            </div>
+          </div>
+
           {/* SMALL PRINT */}
-          <div className="mt-16 space-y-1 text-[11px] uppercase tracking-wide text-white/60">
+          <div className="mt-10 space-y-1 text-[18px] uppercase tracking-wide text-white/60">
             <p className="text-white normal-case">
-              TT Daniel - <em className="italic font-serif">The Revivalist</em>
+              TT DANIEL - <em className="italic font-serif">The Revivalist</em>
             </p>
             <p className="text-white">"God Is Still Making People!"</p>
           </div>

@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 
@@ -41,7 +41,10 @@ const env = { ...fileEnv, ...process.env };
 
 const basePath = normalizeBasePath(env.VITE_BASE_PATH || "/");
 const hostingProvider = (env.VITE_HOSTING_PROVIDER || "hostinger").trim().toLowerCase();
-const hostingerRoutes = (env.VITE_HOSTINGER_STATIC_ROUTES || "/admin/blog")
+const hostingerRoutes = (
+  env.VITE_HOSTINGER_STATIC_ROUTES ||
+  "/home,/about,/books,/events,/spirituality,/counselling,/counseling,/event-details,/interlude-read-more,/gallery,/blog,/blog-details,/admin/blog"
+)
   .split(",")
   .map((route) => route.trim())
   .filter(Boolean);
@@ -51,6 +54,8 @@ mkdirSync(distDir, { recursive: true });
 const htaccess = `<IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase ${basePath}
+  Options -MultiViews
+  ErrorDocument 404 /404.html
 
   # Allow direct access to existing files/folders
   RewriteCond %{REQUEST_FILENAME} -f [OR]
@@ -70,8 +75,8 @@ if (hostingProvider === "github-pages") {
     console.log("postbuild: generated dist/404.html for GitHub Pages");
   }
 } else {
-  if (existsSync(notFoundPath)) {
-    rmSync(notFoundPath);
+  if (existsSync(indexPath)) {
+    copyFileSync(indexPath, notFoundPath);
   }
   for (const route of hostingerRoutes) {
     const clean = route.replace(/^\/+/, "").replace(/\/+$/, "");

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import Container from "../components/ui/Container";
 import {
@@ -8,15 +8,21 @@ import {
   signOutAdmin,
 } from "../lib/supabaseClient";
 import {
+  approveBlogComment,
   createBlogPost,
+  declineBlogComment,
   deleteBlogPost,
   fetchBlogPosts,
+  fetchPendingBlogComments,
   formatBlogDate,
+  formatCommentDate,
   isUsingSupabase,
   sortBlogPosts,
   updateBlogPost,
   uploadBlogImage,
 } from "../lib/blogStore";
+
+const BLOG_COMMENT_MODERATION_SIGNAL_KEY = "ttd_blog_comments_moderated_at";
 
 function toDateTimeInputValue(value) {
   if (!value) return "";
@@ -32,6 +38,17 @@ function isScheduledPost(value) {
   return date.getTime() > Date.now();
 }
 
+function isLikelyRlsErrorMessage(message = "") {
+  const value = String(message || "").toLowerCase();
+  return (
+    value.includes("row-level security") ||
+    value.includes("permission denied") ||
+    value.includes("not allowed") ||
+    value.includes("42501") ||
+    value.includes("policy")
+  );
+}
+
 export default function AdminBlog() {
   const requiresSupabaseAuth = isUsingSupabase();
   const [isVerified, setIsVerified] = useState(!requiresSupabaseAuth);
@@ -45,9 +62,15 @@ export default function AdminBlog() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState("");
+  const [isApprovingCommentId, setIsApprovingCommentId] = useState("");
+  const [isDecliningCommentId, setIsDecliningCommentId] = useState("");
+  const [isLoadingPendingComments, setIsLoadingPendingComments] = useState(false);
+  const [pendingComments, setPendingComments] = useState([]);
+  const [moderationDebug, setModerationDebug] = useState(null);
   const [editingPostId, setEditingPostId] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const contentInputRef = useRef(null);
   const [form, setForm] = useState({
     title: "",
     image: "",
@@ -73,6 +96,44 @@ export default function AdminBlog() {
   };
 
   const sortedPosts = useMemo(() => sortBlogPosts(posts), [posts]);
+  const postTitleById = useMemo(
+    () =>
+      Object.fromEntries(
+        posts.map((post) => [String(post.id), post.title || "Untitled Post"])
+      ),
+    [posts]
+  );
+
+  const refreshPendingComments = async () => {
+    if (!isVerified) {
+      setPendingComments([]);
+      return [];
+    }
+
+    setIsLoadingPendingComments(true);
+    try {
+      const data = await fetchPendingBlogComments();
+      setPendingComments(data);
+      return data;
+    } catch (error) {
+      setFormError(error.message || "Unable to load pending comments.");
+      setModerationDebug({
+        status: "error",
+        action: "Fetch pending comments",
+        message: error.message || "Unknown error",
+        rlsLikely: isLikelyRlsErrorMessage(error.message),
+        time: new Date().toISOString(),
+      });
+      return [];
+    } finally {
+      setIsLoadingPendingComments(false);
+    }
+  };
+
+  const notifyCommentModeration = () => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(BLOG_COMMENT_MODERATION_SIGNAL_KEY, String(Date.now()));
+  };
 
   useEffect(() => {
     if (!imagePreview || !imagePreview.startsWith("blob:")) return;
@@ -140,6 +201,15 @@ export default function AdminBlog() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isVerified) {
+      setPendingComments([]);
+      return;
+    }
+
+    refreshPendingComments();
+  }, [isVerified]);
 
   const handleVerifyAdmin = async (event) => {
     event.preventDefault();
@@ -254,6 +324,92 @@ export default function AdminBlog() {
     window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
   };
 
+  const handleApproveComment = async (commentId) => {
+    setIsApprovingCommentId(commentId);
+    setFormError("");
+
+    try {
+      await approveBlogComment(commentId);
+      const nextPending = await refreshPendingComments();
+      const stillPending = nextPending.some(
+        (comment) => String(comment.id) === String(commentId)
+      );
+      if (stillPending) {
+        setModerationDebug({
+          status: "warning",
+          action: "Approve comment",
+          message:
+            "Approve request finished, but the comment is still pending after reload. This is usually an RLS update policy issue.",
+          rlsLikely: true,
+          time: new Date().toISOString(),
+        });
+      } else {
+        setModerationDebug({
+          status: "success",
+          action: "Approve comment",
+          message: "Comment approved and removed from pending queue.",
+          rlsLikely: false,
+          time: new Date().toISOString(),
+        });
+      }
+      notifyCommentModeration();
+    } catch (error) {
+      setFormError(error.message || "Unable to approve comment.");
+      setModerationDebug({
+        status: "error",
+        action: "Approve comment",
+        message: error.message || "Unknown error",
+        rlsLikely: isLikelyRlsErrorMessage(error.message),
+        time: new Date().toISOString(),
+      });
+    } finally {
+      setIsApprovingCommentId("");
+    }
+  };
+
+  const handleDeclineComment = async (commentId) => {
+    setIsDecliningCommentId(commentId);
+    setFormError("");
+
+    try {
+      await declineBlogComment(commentId);
+      const nextPending = await refreshPendingComments();
+      const stillPending = nextPending.some(
+        (comment) => String(comment.id) === String(commentId)
+      );
+      if (stillPending) {
+        setModerationDebug({
+          status: "warning",
+          action: "Decline comment",
+          message:
+            "Decline request finished, but the comment is still pending after reload. This is usually an RLS delete policy issue.",
+          rlsLikely: true,
+          time: new Date().toISOString(),
+        });
+      } else {
+        setModerationDebug({
+          status: "success",
+          action: "Decline comment",
+          message: "Comment declined and removed from pending queue.",
+          rlsLikely: false,
+          time: new Date().toISOString(),
+        });
+      }
+      notifyCommentModeration();
+    } catch (error) {
+      setFormError(error.message || "Unable to decline comment.");
+      setModerationDebug({
+        status: "error",
+        action: "Decline comment",
+        message: error.message || "Unknown error",
+        rlsLikely: isLikelyRlsErrorMessage(error.message),
+        time: new Date().toISOString(),
+      });
+    } finally {
+      setIsDecliningCommentId("");
+    }
+  };
+
   const handleLockAdmin = async () => {
     setEditingPostId("");
     resetForm();
@@ -272,6 +428,79 @@ export default function AdminBlog() {
     } catch (error) {
       setAuthError(error.message || "Unable to sign out.");
     }
+  };
+
+  const updateContentWithSelection = (formatter) => {
+    const textarea = contentInputRef.current;
+    if (!textarea) return;
+
+    const sourceValue = textarea.value;
+    const selectionStart = textarea.selectionStart ?? 0;
+    const selectionEnd = textarea.selectionEnd ?? selectionStart;
+    const selectedText = sourceValue.slice(selectionStart, selectionEnd);
+    const result = formatter(selectedText);
+    if (!result) return;
+
+    const nextValue =
+      sourceValue.slice(0, selectionStart) + result.text + sourceValue.slice(selectionEnd);
+    setForm((prev) => ({ ...prev, content: nextValue }));
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const start = selectionStart + result.selectionStart;
+      const end = selectionStart + result.selectionEnd;
+      textarea.setSelectionRange(start, end);
+    });
+  };
+
+  const wrapSelectionWithTag = (tagName) => {
+    updateContentWithSelection((selectedText) => {
+      const openTag = `<${tagName}>`;
+      const closeTag = `</${tagName}>`;
+      const innerText = selectedText || "Text";
+      const wrapped = `${openTag}${innerText}${closeTag}`;
+      return {
+        text: wrapped,
+        selectionStart: openTag.length,
+        selectionEnd: openTag.length + innerText.length,
+      };
+    });
+  };
+
+  const applyHeading = (level) => {
+    const tag = level === 2 ? "h2" : "h3";
+    wrapSelectionWithTag(tag);
+  };
+
+  const applyBulletList = () => {
+    updateContentWithSelection((selectedText) => {
+      const lines = (selectedText || "List item")
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+      const listItems = lines.map((line) => `  <li>${line}</li>`).join("\n");
+      const listText = `<ul>\n${listItems}\n</ul>`;
+      return { text: listText, selectionStart: listText.length, selectionEnd: listText.length };
+    });
+  };
+
+  const applyLink = () => {
+    if (typeof window === "undefined") return;
+
+    const urlInput = window.prompt("Enter URL (https://...)");
+    if (!urlInput) return;
+    const url = urlInput.trim();
+    const safeUrl = /^(https?:|mailto:|tel:|\/|#)/i.test(url) ? url : "https://" + url;
+
+    updateContentWithSelection((selectedText) => {
+      const label = selectedText || "Link text";
+      const linkText = `<a href="${safeUrl}">${label}</a>`;
+      return {
+        text: linkText,
+        selectionStart: 0,
+        selectionEnd: linkText.length,
+      };
+    });
   };
 
   return (
@@ -433,11 +662,70 @@ export default function AdminBlog() {
                   placeholder="Short excerpt"
                 />
                 <textarea
+                  ref={contentInputRef}
                   value={form.content}
                   onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))}
                   className="min-h-[140px] rounded-md border border-black/15 bg-white p-3 text-sm outline-none transition focus:border-[#8f6b32]"
-                  placeholder="Full post content"
+                  placeholder="Full post content (supports rich text HTML)"
                 />
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  <button
+                    type="button"
+                    onClick={() => wrapSelectionWithTag("strong")}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    Bold
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => wrapSelectionWithTag("em")}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    Italic
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => wrapSelectionWithTag("u")}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    Underline
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyHeading(2)}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    H2
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyHeading(3)}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    H3
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => wrapSelectionWithTag("blockquote")}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    Quote
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyBulletList}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyLink}
+                    className="inline-flex h-9 items-center justify-center rounded-md border border-black/15 bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-black/75 transition hover:bg-black/5"
+                  >
+                    Link
+                  </button>
+                </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <input
                     type="text"
@@ -569,6 +857,89 @@ export default function AdminBlog() {
                     </div>
                   </article>
                 ))}
+              </div>
+
+              <div className="mt-8 rounded-2xl border border-black/10 bg-white p-5 shadow-[0_20px_44px_-36px_rgba(0,0,0,0.5)]">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#7a6242]">
+                    Pending Comments
+                  </p>
+                  <span className="rounded-full border border-[#c5aa79]/55 bg-[#f4ead6] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#604a2c]">
+                    {pendingComments.length}
+                  </span>
+                </div>
+                {moderationDebug ? (
+                  <div
+                    className={`mt-3 rounded-lg border p-3 text-xs ${
+                      moderationDebug.status === "error"
+                        ? "border-[#8f1e1c]/35 bg-[#fff1f0] text-[#7f1d1d]"
+                        : moderationDebug.status === "warning"
+                          ? "border-[#8a6a3f]/35 bg-[#fff8eb] text-[#6b4f24]"
+                          : "border-[#2f5d29]/35 bg-[#f1fff0] text-[#1e4d1a]"
+                    }`}
+                  >
+                    <p className="font-semibold uppercase tracking-[0.08em]">
+                      {moderationDebug.action} • {moderationDebug.status}
+                    </p>
+                    <p className="mt-1">{moderationDebug.message}</p>
+                    <p className="mt-1 opacity-80">
+                      RLS likely: {moderationDebug.rlsLikely ? "Yes" : "No"} •{" "}
+                      {new Date(moderationDebug.time).toLocaleString()}
+                    </p>
+                  </div>
+                ) : null}
+
+                {isLoadingPendingComments ? (
+                  <p className="mt-4 text-sm text-black/60">Loading pending comments...</p>
+                ) : pendingComments.length === 0 ? (
+                  <p className="mt-4 text-sm text-black/60">No comments awaiting approval.</p>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    {pendingComments.map((comment) => (
+                      <article
+                        key={comment.id}
+                        className="rounded-xl border border-black/10 bg-[#f9f7f2] p-4"
+                      >
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#7a6242]">
+                          {postTitleById[String(comment.postId)] || "Unknown Post"}
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-[#2f2418]">{comment.name}</p>
+                          <p className="text-[11px] uppercase tracking-[0.08em] text-[#7a6242]">
+                            {formatCommentDate(comment.createdAt)}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-sm leading-relaxed text-black/75">
+                          {comment.message}
+                        </p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleApproveComment(comment.id)}
+                            disabled={
+                              isApprovingCommentId === comment.id ||
+                              isDecliningCommentId === comment.id
+                            }
+                            className="inline-flex h-9 items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11] disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isApprovingCommentId === comment.id ? "Approving..." : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeclineComment(comment.id)}
+                            disabled={
+                              isDecliningCommentId === comment.id ||
+                              isApprovingCommentId === comment.id
+                            }
+                            className="inline-flex h-9 items-center justify-center rounded-md border border-[#7a3d30] px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8f1e1c] transition hover:bg-[#7a3d30]/10 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isDecliningCommentId === comment.id ? "Declining..." : "Decline"}
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

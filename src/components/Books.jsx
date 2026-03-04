@@ -1,30 +1,43 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Container from "./ui/Container";
 import { books, booksFallbackImage } from "../data/books";
 
-const NEW_RELEASE_LINK = "https://buy.stripe.com/9B68wPe5K3xFb3T1GDao803";
+function detectAfricaTimezone() {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    return timezone.startsWith("Africa/");
+  } catch {
+    return false;
+  }
+}
 
 export default function Books() {
   const [activeBook, setActiveBook] = useState(null);
+  const [isAfricaUser, setIsAfricaUser] = useState(() => detectAfricaTimezone());
+
+  useEffect(() => {
+    // Keep regional behavior without triggering location permission prompts.
+    setIsAfricaUser(detectAfricaTimezone());
+  }, []);
+
   const modalDetails = useMemo(() => {
     if (!activeBook) return null;
 
-    const { book, index } = activeBook;
-    const actionLabel =
-      index === 0
-        ? "Ebook"
-        : book.amazon
-          ? "Amazon"
-          : book.ebook
-            ? "Ebook"
-            : "Coming soon";
-    const actionHref = index === 0 ? NEW_RELEASE_LINK : book.amazon || null;
+    const { book } = activeBook;
+    const ebookHref = isAfricaUser ? book.paystackLink || null : book.stripeLink || null;
+    const actionButtons = [
+      ...(book.amazon ? [{ label: "Amazon", href: book.amazon }] : []),
+      ...(ebookHref ? [{ label: "Ebook", href: ebookHref }] : []),
+    ];
+    const priceTag = isAfricaUser
+      ? book.ghsPrice || book.price
+      : book.usdPrice || book.price;
     const description =
       book.details ||
       `${book.blurb} This book offers deeper biblical and practical guidance for personal transformation, growth, and daily Christian living.`;
 
-    return { book, actionLabel, actionHref, description };
-  }, [activeBook]);
+    return { book, actionButtons, priceTag, description };
+  }, [activeBook, isAfricaUser]);
 
   return (
     <section id="books" className="bg-[#f5f1e8] text-[#1b1711]">
@@ -46,9 +59,8 @@ export default function Books() {
           Books
         </h2>
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[#4e4336] md:text-base">
-          <span className="font-bold">Note:</span> Amazon prices may differ from
-          the listed prices on this site. Grab your copy of the book at its
-          original prices by email: ttdanielplus@gmail.com.
+          <span className="font-bold">Note:</span> Prices differ from the Amazon listing as these are direct author sales without the retail markup. 
+          Buying directly also helps support future book projects and keeps prices affordable for readers worldwide.
         </p>
 
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -56,23 +68,16 @@ export default function Books() {
             const isFeatured =
               idx === 0 &&
               pkg.title === "ACCESS PORTALS FOR SUPERNATURAL BREAKTHROUGHS";
-            const priceTag =
-              idx === 0 && typeof pkg.price === "string" && /coming soon/i.test(pkg.price)
-                ? "New Release"
-                : pkg.price;
-            const label =
-              idx === 0
-                ? "Ebook"
-                : pkg.amazon
-                  ? "Amazon"
-                  : pkg.ebook
-                    ? "Ebook"
-                    : "Coming soon";
-            const href =
-              idx === 0
-                ? NEW_RELEASE_LINK
-                : pkg.amazon || (pkg.ebook ? "#books" : null);
-            const opensNewTab = idx === 0 || Boolean(pkg.amazon);
+            const priceTag = isAfricaUser
+              ? pkg.ghsPrice || pkg.price
+              : pkg.usdPrice || pkg.price;
+            const ebookHref = isAfricaUser
+              ? pkg.paystackLink || null
+              : pkg.stripeLink || null;
+            const actionButtons = [
+              ...(pkg.amazon ? [{ label: "Amazon", href: pkg.amazon }] : []),
+              ...(ebookHref ? [{ label: "Ebook", href: ebookHref }] : []),
+            ];
 
             return (
               <article
@@ -122,19 +127,26 @@ export default function Books() {
                     </button>
                   </p>
 
-                  {href ? (
-                    <a
-                      href={href}
-                      target={opensNewTab ? "_blank" : undefined}
-                      rel={opensNewTab ? "noopener noreferrer" : undefined}
-                      aria-label={`${pkg.title.replace(/\n/g, " ")} ${label}`}
-                      className="mt-auto inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11]"
-                    >
-                      {label}
-                    </a>
+                  {actionButtons.length > 0 ? (
+                    <div className="mt-auto grid grid-cols-2 gap-2">
+                      {actionButtons.map((button) => (
+                        <a
+                          key={`${pkg.title}-${button.label}`}
+                          href={button.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-label={`${pkg.title.replace(/\n/g, " ")} ${button.label}`}
+                          className={`inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11] ${
+                            actionButtons.length === 1 ? "col-span-2" : ""
+                          }`}
+                        >
+                          {button.label}
+                        </a>
+                      ))}
+                    </div>
                   ) : (
                     <span className="mt-auto inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-sm font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
-                      {label}
+                      Coming soon
                     </span>
                   )}
                 </div>
@@ -189,25 +201,32 @@ export default function Books() {
               />
               <div className="flex min-h-0 flex-col">
                 <p className="inline-flex rounded-full border border-[#d7c39f] bg-[#efe1c8] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#3a2b16]">
-                  {modalDetails.book.price}
+                  {modalDetails.priceTag}
                 </p>
                 <div className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1">
                   <p className="text-sm leading-relaxed text-[#4a3b2a]">
                     {modalDetails.description}
                   </p>
                 </div>
-                {modalDetails.actionHref ? (
-                  <a
-                    href={modalDetails.actionHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-5 inline-flex h-10 items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11]"
-                  >
-                    {modalDetails.actionLabel}
-                  </a>
+                {modalDetails.actionButtons.length > 0 ? (
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    {modalDetails.actionButtons.map((button) => (
+                      <a
+                        key={`${modalDetails.book.title}-${button.label}`}
+                        href={button.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex h-10 items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11] ${
+                          modalDetails.actionButtons.length === 1 ? "col-span-2" : ""
+                        }`}
+                      >
+                        {button.label}
+                      </a>
+                    ))}
+                  </div>
                 ) : (
                   <span className="mt-5 inline-flex h-10 items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] px-5 text-xs font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
-                    {modalDetails.actionLabel}
+                    Coming soon
                   </span>
                 )}
               </div>

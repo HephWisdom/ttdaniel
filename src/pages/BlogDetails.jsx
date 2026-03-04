@@ -1,14 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Container from "../components/ui/Container";
 import blogFallbackImage from "../assets/ttdaniel1.png";
 import {
+  addBlogLoveReaction,
   createBlogComment,
+  fetchBlogLoveStats,
   fetchPublishedBlogPostById,
   fetchCommentsByPostId,
   formatBlogDate,
   formatCommentDate,
+  removeBlogLoveReaction,
 } from "../lib/blogStore";
+import { hasHtmlContent, sanitizeBlogHtml } from "../lib/blogContent";
+
+const BLOG_COMMENT_MODERATION_SIGNAL_KEY = "ttd_blog_comments_moderated_at";
+const BLOG_LOVE_REACTION_SIGNAL_KEY = "ttd_blog_love_reaction_signal_v1";
 
 function renderArticleBlocks(content = "", postId = "") {
   const lines = content.split("\n");
@@ -129,10 +136,42 @@ export default function BlogDetails() {
   const [comments, setComments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", message: "" });
+  const [form, setForm] = useState({ name: "", message: "", website: "" });
   const [commentError, setCommentError] = useState("");
+  const [commentNotice, setCommentNotice] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isLinkCopied, setIsLinkCopied] = useState(false);
+  const [loveCount, setLoveCount] = useState(0);
+  const [hasLoved, setHasLoved] = useState(false);
+  const [isSubmittingLove, setIsSubmittingLove] = useState(false);
+  const [loveError, setLoveError] = useState("");
+  const hasRichHtmlContent = hasHtmlContent(post?.content || "");
+  const safeHtmlContent = useMemo(
+    () => (hasRichHtmlContent ? sanitizeBlogHtml(post?.content || "") : ""),
+    [hasRichHtmlContent, post?.content]
+  );
+
+  const refreshApprovedComments = async (id) => {
+    if (!id) return;
+    try {
+      const latestComments = await fetchCommentsByPostId(id);
+      setComments(latestComments);
+    } catch {
+      // Keep existing comments if a refresh fails.
+    }
+  };
+
+  const refreshLoveStats = async (id) => {
+    if (!id) return;
+    try {
+      const stats = await fetchBlogLoveStats(id);
+      setLoveCount(stats.count);
+      setHasLoved(stats.hasReacted);
+    } catch {
+      // Keep existing love stats if refresh fails.
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -145,11 +184,15 @@ export default function BlogDetails() {
 
       try {
         const loadedPost = await fetchPublishedBlogPostById(postId);
-        const loadedComments = loadedPost ? await fetchCommentsByPostId(postId) : [];
+        const [loadedComments, loadedLoveStats] = loadedPost
+          ? await Promise.all([fetchCommentsByPostId(postId), fetchBlogLoveStats(postId)])
+          : [[], { count: 0, hasReacted: false }];
 
         if (!isMounted) return;
         setPost(loadedPost);
         setComments(loadedComments);
+        setLoveCount(loadedLoveStats.count);
+        setHasLoved(loadedLoveStats.hasReacted);
       } catch (loadError) {
         if (isMounted) {
           setError(loadError.message || "Unable to load this blog post.");
@@ -168,10 +211,62 @@ export default function BlogDetails() {
     };
   }, [postId]);
 
+  useEffect(() => {
+    if (!postId) return;
+
+    let isCancelled = false;
+    const refreshComments = async () => {
+      if (isCancelled) return;
+      await Promise.all([refreshApprovedComments(postId), refreshLoveStats(postId)]);
+    };
+
+    const intervalId = window.setInterval(refreshComments, 10000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [postId]);
+
+  useEffect(() => {
+    if (!postId) return;
+
+    const onStorage = (event) => {
+      if (event.key === BLOG_COMMENT_MODERATION_SIGNAL_KEY) {
+        refreshApprovedComments(postId);
+      }
+      if (event.key === BLOG_LOVE_REACTION_SIGNAL_KEY) {
+        refreshLoveStats(postId);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshApprovedComments(postId);
+        refreshLoveStats(postId);
+      }
+    };
+
+    window.addEventListener("storage", onStorage);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [postId]);
+
   const handleSubmitComment = async (event) => {
     event.preventDefault();
 
     if (!postId) return;
+    // Hidden honeypot field for basic bot filtering.
+    if (form.website.trim()) {
+      setForm({ name: "", message: "", website: "" });
+      setCommentError("");
+      setCommentNotice("Comment submitted. It will appear after admin approval.");
+      return;
+    }
     if (!form.name.trim() || !form.message.trim()) {
       setCommentError("Name and comment are required.");
       return;
@@ -179,11 +274,17 @@ export default function BlogDetails() {
 
     setIsSubmittingComment(true);
     setCommentError("");
+    setCommentNotice("");
 
     try {
       const newComment = await createBlogComment(postId, form);
-      setComments((prev) => [newComment, ...prev]);
-      setForm({ name: "", message: "" });
+      if (newComment.approved) {
+        setComments((prev) => [newComment, ...prev]);
+        setCommentNotice("Comment posted successfully.");
+      } else {
+        setCommentNotice("Comment submitted. It will appear after admin approval.");
+      }
+      setForm({ name: "", message: "", website: "" });
     } catch (submitError) {
       setCommentError(submitError.message || "Unable to post comment.");
     } finally {
@@ -214,6 +315,54 @@ export default function BlogDetails() {
       URL.revokeObjectURL(objectUrl);
     } catch {
       window.open(imageUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleSharePostLink = async () => {
+    if (!postId) return;
+    const path = `/blog/${postId}`;
+    const postUrl = typeof window === "undefined" ? path : `${window.location.origin}${path}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: post?.title || "Blog post", url: postUrl });
+        setIsLinkCopied(true);
+        window.setTimeout(() => setIsLinkCopied(false), 1800);
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(postUrl);
+      } else {
+        const fallbackInput = document.createElement("input");
+        fallbackInput.value = postUrl;
+        document.body.appendChild(fallbackInput);
+        fallbackInput.select();
+        document.execCommand("copy");
+        fallbackInput.remove();
+      }
+      setIsLinkCopied(true);
+      window.setTimeout(() => setIsLinkCopied(false), 1800);
+    } catch {
+      window.open(postUrl, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleLoveReaction = async () => {
+    if (!postId || isSubmittingLove) return;
+    setIsSubmittingLove(true);
+    setLoveError("");
+
+    try {
+      const nextStats = hasLoved
+        ? await removeBlogLoveReaction(postId)
+        : await addBlogLoveReaction(postId);
+      setLoveCount(nextStats.count);
+      setHasLoved(nextStats.hasReacted);
+    } catch (reactionError) {
+      setLoveError(reactionError.message || "Unable to add love reaction.");
+    } finally {
+      setIsSubmittingLove(false);
     }
   };
 
@@ -285,12 +434,21 @@ export default function BlogDetails() {
       <div className="absolute inset-0 bg-[radial-gradient(950px_520px_at_50%_-10%,rgba(145,109,61,0.15),transparent_72%)]" />
       <Container className="relative py-14 md:py-20">
         <div className="mx-auto max-w-6xl">
-          <Link
-            to="/#blog"
-            className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5a2f] underline decoration-[#7a5a2f]/45 underline-offset-4 transition hover:text-[#2d2112] hover:decoration-[#2d2112]"
-          >
-            ← Back to Blog
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to="/#blog"
+              className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a5a2f] underline decoration-[#7a5a2f]/45 underline-offset-4 transition hover:text-[#2d2112] hover:decoration-[#2d2112]"
+            >
+              ← Back to Blog
+            </Link>
+            <button
+              type="button"
+              onClick={handleSharePostLink}
+              className="inline-flex h-8 items-center justify-center rounded-full border border-[#7a5a2f]/45 bg-[#f4ead7] px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#4e381d] transition hover:bg-[#4e381d] hover:text-[#f4ead7]"
+            >
+              {isLinkCopied ? "Shared" : "Share Link"}
+            </button>
+          </div>
 
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
             <article className="rounded-[24px] border border-[#d8c4a1] bg-[#fffdf8] p-5 shadow-[0_30px_70px_-50px_rgba(0,0,0,0.4)] md:p-10">
@@ -319,7 +477,39 @@ export default function BlogDetails() {
               </header>
 
               <div className="mx-auto mt-8 max-w-[68ch] border-l border-[#e7dac5] pl-5 font-serif md:pl-7">
-                {renderArticleBlocks(post.content, post.id)}
+                {hasRichHtmlContent ? (
+                  <div
+                    className="text-[1.08rem] leading-[2.05] tracking-[0.002em] text-[#332618] [&>*:first-child]:mt-0 [&_a]:text-[#7a5a2f] [&_a]:underline [&_a]:decoration-[#7a5a2f]/45 [&_a]:underline-offset-4 [&_blockquote]:mt-7 [&_blockquote]:border-l-2 [&_blockquote]:border-[#b99a6a] [&_blockquote]:pl-5 [&_blockquote]:italic [&_h2]:mt-8 [&_h2]:text-[1.65rem] [&_h2]:leading-tight [&_h2]:text-[#1f160d] [&_h3]:mt-7 [&_h3]:text-[1.35rem] [&_h3]:leading-tight [&_h3]:text-[#2b1f12] [&_li]:text-[1.04rem] [&_li]:leading-8 [&_ol]:mt-5 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-6 [&_p]:mt-5 [&_ul]:mt-5 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-6"
+                    dangerouslySetInnerHTML={{ __html: safeHtmlContent }}
+                  />
+                ) : (
+                  renderArticleBlocks(post.content, post.id)
+                )}
+              </div>
+              <div className="mx-auto mt-8 max-w-[68ch] border-t border-[#e7dac5] pt-6">
+                <button
+                  type="button"
+                  onClick={handleLoveReaction}
+                  disabled={isSubmittingLove}
+                  className={`inline-flex h-10 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                    hasLoved
+                      ? "border-[#8f1e1c]/45 bg-[#8f1e1c] text-white"
+                      : "border-[#8f1e1c]/45 bg-[#fff4f2] text-[#8f1e1c] hover:bg-[#8f1e1c] hover:text-white"
+                  } disabled:cursor-not-allowed disabled:opacity-80`}
+                  aria-label="Love react to this blog post"
+                >
+                  <span aria-hidden="true">♥</span>
+                  <span>
+                    {isSubmittingLove
+                      ? hasLoved
+                        ? "Removing..."
+                        : "Loving..."
+                      : hasLoved
+                        ? `Loved (${loveCount})`
+                        : `Love (${loveCount})`}
+                  </span>
+                </button>
+                {loveError ? <p className="mt-3 text-sm text-[#8f1e1c]">{loveError}</p> : null}
               </div>
             </article>
 
@@ -362,12 +552,27 @@ export default function BlogDetails() {
                 onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
                 className="h-11 rounded-md border border-[#cab18a] bg-white px-3 text-sm outline-none transition focus:border-[#8a6a3f]"
                 placeholder="Your name"
+                minLength={2}
+                maxLength={80}
+                autoComplete="name"
+                required
               />
               <textarea
                 value={form.message}
                 onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
                 className="min-h-[120px] rounded-md border border-[#cab18a] bg-white p-3 text-sm outline-none transition focus:border-[#8a6a3f]"
                 placeholder="Write your comment"
+                maxLength={1200}
+                required
+              />
+              <input
+                type="text"
+                value={form.website}
+                onChange={(event) => setForm((prev) => ({ ...prev, website: event.target.value }))}
+                className="hidden"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
               />
               <button
                 type="submit"
@@ -377,6 +582,7 @@ export default function BlogDetails() {
                 {isSubmittingComment ? "Posting..." : "Post Comment"}
               </button>
               {commentError ? <p className="text-sm text-[#8f1e1c]">{commentError}</p> : null}
+              {commentNotice ? <p className="text-sm text-[#2f5d29]">{commentNotice}</p> : null}
             </form>
 
             <div className="mt-6 space-y-3">

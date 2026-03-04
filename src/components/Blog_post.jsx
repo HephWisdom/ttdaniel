@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Container from "./ui/Container";
 import { fetchPublishedBlogPosts, sortBlogPosts } from "../lib/blogStore";
+import { toPlainBlogText } from "../lib/blogContent";
 
 const ARTICLE_CARD_STYLES = [
   {
@@ -28,16 +29,23 @@ const ARTICLE_CARD_STYLES = [
 ];
 
 const toExcerpt = (content = "", limit = 135) => {
-  const plain = content.replace(/[#*_`>[\]()!-]/g, " ").replace(/\s+/g, " ").trim();
+  const plain = toPlainBlogText(content);
   if (!plain) return "Read this blog post for practical insights and ministry updates.";
   if (plain.length <= limit) return plain;
   return `${plain.slice(0, limit).trimEnd()}...`;
+};
+
+const buildPostUrl = (postId) => {
+  const path = `/blog/${postId}`;
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
 };
 
 export default function BlogPost() {
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sharedPostId, setSharedPostId] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -70,6 +78,34 @@ export default function BlogPost() {
   }, []);
 
   const featuredPosts = useMemo(() => sortBlogPosts(posts).slice(0, 3), [posts]);
+
+  const handleShareLink = async (postId, postTitle) => {
+    const postUrl = buildPostUrl(postId);
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: postTitle || "Blog post", url: postUrl });
+        setSharedPostId(String(postId));
+        window.setTimeout(() => setSharedPostId(""), 1800);
+        return;
+      }
+
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(postUrl);
+      } else {
+        const fallbackInput = document.createElement("input");
+        fallbackInput.value = postUrl;
+        document.body.appendChild(fallbackInput);
+        fallbackInput.select();
+        document.execCommand("copy");
+        fallbackInput.remove();
+      }
+      setSharedPostId(String(postId));
+      window.setTimeout(() => setSharedPostId(""), 1800);
+    } catch {
+      window.open(postUrl, "_blank", "noopener,noreferrer");
+    }
+  };
 
   return (
     <section id="blog" className="bg-[#dcdcdc] text-black">
@@ -108,13 +144,22 @@ export default function BlogPost() {
                           {toExcerpt(post.content)}
                         </p>
 
-                        <Link
-                          to={`/blog/${post.id}`}
-                          className="relative z-10 mt-auto inline-flex items-center gap-2 pt-7 text-[13px] font-black uppercase tracking-[0.06em] text-[#141414] transition-all duration-200 hover:gap-3"
-                        >
-                          Read More
-                          <span aria-hidden="true">→</span>
-                        </Link>
+                        <div className="relative z-10 mt-auto flex items-center gap-3 pt-7">
+                          <Link
+                            to={`/blog/${post.id}`}
+                            className="inline-flex items-center gap-2 text-[13px] font-black uppercase tracking-[0.06em] text-[#141414] transition-all duration-200 hover:gap-3"
+                          >
+                            Read More
+                            <span aria-hidden="true">→</span>
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => handleShareLink(post.id, post.title)}
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-black/25 px-3 text-[10px] font-bold uppercase tracking-[0.08em] text-[#141414] transition hover:bg-black hover:text-white"
+                          >
+                            {sharedPostId === String(post.id) ? "Shared" : "Share Link"}
+                          </button>
+                        </div>
                       </article>
                     );
                   })}
