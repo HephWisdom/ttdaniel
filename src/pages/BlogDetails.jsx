@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import BlogSubscribeButton from "../components/BlogSubscribeButton";
 import Container from "../components/ui/Container";
 import blogFallbackImage from "../assets/ttdaniel1.png";
 import {
@@ -12,10 +13,62 @@ import {
   formatCommentDate,
   removeBlogLoveReaction,
 } from "../lib/blogStore";
-import { hasHtmlContent, sanitizeBlogHtml } from "../lib/blogContent";
+import { hasHtmlContent, sanitizeBlogHtml, toPlainBlogText } from "../lib/blogContent";
+import { trackBlogPostView } from "../lib/siteAnalytics";
 
 const BLOG_COMMENT_MODERATION_SIGNAL_KEY = "ttd_blog_comments_moderated_at";
 const BLOG_LOVE_REACTION_SIGNAL_KEY = "ttd_blog_love_reaction_signal_v1";
+const DEFAULT_PAGE_TITLE = "TT Daniel";
+const DEFAULT_PAGE_DESCRIPTION =
+  "Rev. TT Daniel – The Revivalist. Founder and President of Pleasant Pentecostal Church (PPC). Ministry, outreach, and revival work.";
+
+function setMetaTag(name, content) {
+  if (typeof document === "undefined") return;
+  let tag = document.querySelector(`meta[name="${name}"]`);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute("name", name);
+    document.head.appendChild(tag);
+  }
+  tag.setAttribute("content", content);
+}
+
+function removeMetaTag(name) {
+  if (typeof document === "undefined") return;
+  document.querySelector(`meta[name="${name}"]`)?.remove();
+}
+
+function setCanonicalLink(href) {
+  if (typeof document === "undefined") return;
+  let link = document.querySelector('link[rel="canonical"][data-blog-seo="true"]');
+  if (!link) {
+    link = document.createElement("link");
+    link.setAttribute("rel", "canonical");
+    link.setAttribute("data-blog-seo", "true");
+    document.head.appendChild(link);
+  }
+  link.setAttribute("href", href);
+}
+
+function removeCanonicalLink() {
+  if (typeof document === "undefined") return;
+  document.querySelector('link[rel="canonical"][data-blog-seo="true"]')?.remove();
+}
+
+function buildSeoDescription(post) {
+  const source = String(post?.excerpt || "").trim() || toPlainBlogText(post?.content || "");
+  if (!source) return DEFAULT_PAGE_DESCRIPTION;
+  if (source.length <= 160) return source;
+  return `${source.slice(0, 157).trimEnd()}...`;
+}
+
+function resetBlogSeoMetadata() {
+  if (typeof document === "undefined") return;
+  document.title = DEFAULT_PAGE_TITLE;
+  setMetaTag("description", DEFAULT_PAGE_DESCRIPTION);
+  removeMetaTag("robots");
+  removeCanonicalLink();
+}
 
 function renderArticleBlocks(content = "", postId = "") {
   const lines = content.split("\n");
@@ -75,6 +128,7 @@ function renderArticleBlocks(content = "", postId = "") {
     }
 
     flushList();
+    flushParagraph();
     paragraphBuffer.push(line);
   });
 
@@ -102,7 +156,7 @@ function renderArticleBlocks(content = "", postId = "") {
       return (
         <blockquote
           key={`${postId}-quote-${index}`}
-          className="mt-7 border-l-2 border-[#b99a6a] pl-5 font-serif text-[1.08rem] italic leading-8 text-[#4a3824]"
+          className="blog-detail-quote-block mt-7 font-serif text-[1.08rem] italic leading-8 text-[#4a3824]"
         >
           {block.text}
         </blockquote>
@@ -184,9 +238,23 @@ export default function BlogDetails() {
 
       try {
         const loadedPost = await fetchPublishedBlogPostById(postId);
-        const [loadedComments, loadedLoveStats] = loadedPost
-          ? await Promise.all([fetchCommentsByPostId(postId), fetchBlogLoveStats(postId)])
-          : [[], { count: 0, hasReacted: false }];
+        let loadedComments = [];
+        let loadedLoveStats = { count: 0, hasReacted: false };
+
+        if (loadedPost) {
+          const [commentsResult, loveStatsResult] = await Promise.allSettled([
+            fetchCommentsByPostId(postId),
+            fetchBlogLoveStats(postId),
+          ]);
+
+          if (commentsResult.status === "fulfilled") {
+            loadedComments = commentsResult.value;
+          }
+
+          if (loveStatsResult.status === "fulfilled") {
+            loadedLoveStats = loveStatsResult.value;
+          }
+        }
 
         if (!isMounted) return;
         setPost(loadedPost);
@@ -210,6 +278,33 @@ export default function BlogDetails() {
       isMounted = false;
     };
   }, [postId]);
+
+  useEffect(() => {
+    if (!postId || !post) return;
+    trackBlogPostView(postId, `/blog/${postId}`);
+  }, [post, postId]);
+
+  useEffect(() => {
+    if (!post || !postId || typeof document === "undefined") return;
+
+    document.title = `${post.title} | TT Daniel`;
+
+    if (post.seoEnabled === false) {
+      setMetaTag("description", DEFAULT_PAGE_DESCRIPTION);
+      setMetaTag("robots", "noindex, nofollow");
+      removeCanonicalLink();
+    } else {
+      setMetaTag("description", buildSeoDescription(post));
+      removeMetaTag("robots");
+      if (typeof window !== "undefined") {
+        setCanonicalLink(`${window.location.origin}/blog/${postId}`);
+      }
+    }
+
+    return () => {
+      resetBlogSeoMetadata();
+    };
+  }, [post, postId]);
 
   useEffect(() => {
     if (!postId) return;
@@ -260,6 +355,11 @@ export default function BlogDetails() {
     event.preventDefault();
 
     if (!postId) return;
+    if (post?.allowComments === false) {
+      setCommentNotice("");
+      setCommentError("Comments are disabled for this post.");
+      return;
+    }
     // Hidden honeypot field for basic bot filtering.
     if (form.website.trim()) {
       setForm({ name: "", message: "", website: "" });
@@ -360,7 +460,7 @@ export default function BlogDetails() {
       setLoveCount(nextStats.count);
       setHasLoved(nextStats.hasReacted);
     } catch (reactionError) {
-      setLoveError(reactionError.message || "Unable to add love reaction.");
+      setLoveError(reactionError.message || "Unable to update like.");
     } finally {
       setIsSubmittingLove(false);
     }
@@ -451,11 +551,31 @@ export default function BlogDetails() {
           </div>
 
           <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
-            <article className="rounded-[24px] border border-[#d8c4a1] bg-[#fffdf8] p-5 shadow-[0_30px_70px_-50px_rgba(0,0,0,0.4)] md:p-10">
+            <article
+              className="rounded-[24px] border border-[#d8c4a1] bg-[#fffdf8] p-5 shadow-[0_30px_70px_-50px_rgba(0,0,0,0.4)] md:p-10"
+              data-analytics-section="blog-article"
+            >
               <header className="mx-auto max-w-2xl border-b border-[#e4d6bf] pb-8 text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8a6a3f]">
                   {formatBlogDate(post.createdAt)}
                 </p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                  {post.isFeatured ? (
+                    <span className="rounded-full border border-[#d8c4a1] bg-[#f7eddb] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#47331d]">
+                      Featured Article
+                    </span>
+                  ) : null}
+                  {post.allowComments === false ? (
+                    <span className="rounded-full border border-[#d8c4a1] bg-[#fff1e5] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#8c4a14]">
+                      Comments Closed
+                    </span>
+                  ) : null}
+                  {post.seoEnabled === false ? (
+                    <span className="rounded-full border border-[#d8c4a1] bg-[#f1efeb] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#63594b]">
+                      Search Hidden
+                    </span>
+                  ) : null}
+                </div>
                 <h1 className="mt-4 font-serif text-3xl leading-tight text-[#1f160d] md:text-[2.7rem]">
                   {post.title}
                 </h1>
@@ -476,40 +596,58 @@ export default function BlogDetails() {
                 ) : null}
               </header>
 
-              <div className="mx-auto mt-8 max-w-[68ch] border-l border-[#e7dac5] pl-5 font-serif md:pl-7">
+              <div className="blog-detail-body mx-auto mt-8 max-w-[68ch] border-l border-[#e7dac5] pl-5 font-serif md:pl-7">
                 {hasRichHtmlContent ? (
                   <div
-                    className="text-[1.08rem] leading-[2.05] tracking-[0.002em] text-[#332618] [&>*:first-child]:mt-0 [&_a]:text-[#7a5a2f] [&_a]:underline [&_a]:decoration-[#7a5a2f]/45 [&_a]:underline-offset-4 [&_blockquote]:mt-7 [&_blockquote]:border-l-2 [&_blockquote]:border-[#b99a6a] [&_blockquote]:pl-5 [&_blockquote]:italic [&_h2]:mt-8 [&_h2]:text-[1.65rem] [&_h2]:leading-tight [&_h2]:text-[#1f160d] [&_h3]:mt-7 [&_h3]:text-[1.35rem] [&_h3]:leading-tight [&_h3]:text-[#2b1f12] [&_li]:text-[1.04rem] [&_li]:leading-8 [&_ol]:mt-5 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-6 [&_p]:mt-5 [&_ul]:mt-5 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-6"
+                    className="text-[1.08rem] leading-[2.05] tracking-[0.002em] text-[#332618] [&>*:first-child]:mt-0 [&_a]:text-[#7a5a2f] [&_a]:underline [&_a]:decoration-[#7a5a2f]/45 [&_a]:underline-offset-4 [&_code]:rounded-md [&_code]:bg-[#efe3cf] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.95rem] [&_div]:mt-5 [&_div]:text-[1.08rem] [&_div]:leading-[2.05] [&_div]:tracking-[0.002em] [&_h1]:mt-8 [&_h1]:font-serif [&_h1]:text-[2rem] [&_h1]:leading-tight [&_h1]:text-[#1b140e] [&_h2]:mt-8 [&_h2]:text-[1.65rem] [&_h2]:leading-tight [&_h2]:text-[#1f160d] [&_h3]:mt-7 [&_h3]:text-[1.35rem] [&_h3]:leading-tight [&_h3]:text-[#2b1f12] [&_img]:mt-6 [&_img]:rounded-[18px] [&_img]:border [&_img]:border-[#dcc8aa] [&_img]:shadow-[0_18px_40px_-30px_rgba(0,0,0,0.5)] [&_li]:text-[1.04rem] [&_li]:leading-8 [&_ol]:mt-5 [&_ol]:list-decimal [&_ol]:space-y-2 [&_ol]:pl-6 [&_p]:mt-5 [&_pre]:mt-6 [&_pre]:overflow-x-auto [&_pre]:rounded-[18px] [&_pre]:bg-[#1f1b17] [&_pre]:p-5 [&_pre]:font-mono [&_pre]:text-[0.95rem] [&_pre]:leading-7 [&_pre]:text-[#f6eddc] [&_ul]:mt-5 [&_ul]:list-disc [&_ul]:space-y-2 [&_ul]:pl-6"
                     dangerouslySetInnerHTML={{ __html: safeHtmlContent }}
                   />
                 ) : (
                   renderArticleBlocks(post.content, post.id)
                 )}
               </div>
-              <div className="mx-auto mt-8 max-w-[68ch] border-t border-[#e7dac5] pt-6">
+              <div className="mx-auto mt-8 flex max-w-[68ch] flex-wrap items-center gap-3 border-t border-[#e7dac5] pt-6">
                 <button
                   type="button"
                   onClick={handleLoveReaction}
                   disabled={isSubmittingLove}
-                  className={`inline-flex h-10 items-center justify-center gap-2 rounded-full border px-4 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
+                  className={`inline-flex h-11 items-center justify-center gap-2 rounded-full border px-5 text-[11px] font-semibold uppercase tracking-[0.12em] transition ${
                     hasLoved
-                      ? "border-[#8f1e1c]/45 bg-[#8f1e1c] text-white"
-                      : "border-[#8f1e1c]/45 bg-[#fff4f2] text-[#8f1e1c] hover:bg-[#8f1e1c] hover:text-white"
+                      ? "border-[#1d4ed8]/45 bg-[#2563eb] text-white"
+                      : "border-[#1d4ed8]/30 bg-[#eff6ff] text-[#1d4ed8] hover:bg-[#2563eb] hover:text-white"
                   } disabled:cursor-not-allowed disabled:opacity-80`}
-                  aria-label="Love react to this blog post"
+                  aria-label="Like this blog post"
                 >
-                  <span aria-hidden="true">♥</span>
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M7 11v9" />
+                    <path d="M7 20H4.8A1.8 1.8 0 0 1 3 18.2v-5.4A1.8 1.8 0 0 1 4.8 11H7" />
+                    <path d="M14.7 4.4 13 11h6.1a1.9 1.9 0 0 1 1.88 2.19l-.76 5a2.6 2.6 0 0 1-2.57 2.21H7V11.3a2.8 2.8 0 0 0 .6-1.72V8.3c0-.74.29-1.45.81-1.98l2.91-2.92a2 2 0 0 1 3.38 1.9Z" />
+                  </svg>
                   <span>
-                    {isSubmittingLove
-                      ? hasLoved
-                        ? "Removing..."
-                        : "Loving..."
-                      : hasLoved
-                        ? `Loved (${loveCount})`
-                        : `Love (${loveCount})`}
+                    {isSubmittingLove ? (hasLoved ? "Removing..." : "Saving...") : hasLoved ? "Liked" : "Like"}
                   </span>
                 </button>
-                {loveError ? <p className="mt-3 text-sm text-[#8f1e1c]">{loveError}</p> : null}
+                <span className="inline-flex h-11 items-center rounded-full border border-[#d7c4a6] bg-[#fff8eb] px-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#4f3e2b]">
+                  {loveCount} {loveCount === 1 ? "Like" : "Likes"}
+                </span>
+                <BlogSubscribeButton
+                  buttonLabel="Subscribe"
+                  buttonClassName="border-[#8a6a3f]/30 bg-[#fcf4e7] px-5 text-[#4e381d] hover:bg-[#4e381d] hover:text-[#f6ead6]"
+                  helperClassName="basis-full mt-1 text-left text-[#6a5235]"
+                  helperText="Subscribe to get the next post in your inbox."
+                />
+                {loveError ? (
+                  <p className="basis-full text-sm text-[#8f1e1c]">{loveError}</p>
+                ) : null}
               </div>
             </article>
 
@@ -542,52 +680,70 @@ export default function BlogDetails() {
             </aside>
           </div>
 
-          <section className="mt-8 rounded-[24px] border border-[#d8c4a1] bg-[#fffdf8] p-5 shadow-[0_24px_60px_-50px_rgba(0,0,0,0.45)] md:p-8 lg:mr-[352px]">
+          <section
+            className="mt-8 rounded-[24px] border border-[#d8c4a1] bg-[#fffdf8] p-5 shadow-[0_24px_60px_-50px_rgba(0,0,0,0.45)] md:p-8 lg:mr-[352px]"
+            data-analytics-section="comments"
+          >
             <h2 className="font-serif text-3xl text-[#251a10]">Comments</h2>
-
-            <form onSubmit={handleSubmitComment} className="mt-5 grid gap-3">
-              <input
-                type="text"
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                className="h-11 rounded-md border border-[#cab18a] bg-white px-3 text-sm outline-none transition focus:border-[#8a6a3f]"
-                placeholder="Your name"
-                minLength={2}
-                maxLength={80}
-                autoComplete="name"
-                required
-              />
-              <textarea
-                value={form.message}
-                onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
-                className="min-h-[120px] rounded-md border border-[#cab18a] bg-white p-3 text-sm outline-none transition focus:border-[#8a6a3f]"
-                placeholder="Write your comment"
-                maxLength={1200}
-                required
-              />
-              <input
-                type="text"
-                value={form.website}
-                onChange={(event) => setForm((prev) => ({ ...prev, website: event.target.value }))}
-                className="hidden"
-                tabIndex={-1}
-                autoComplete="off"
-                aria-hidden="true"
-              />
-              <button
-                type="submit"
-                disabled={isSubmittingComment}
-                className="inline-flex h-11 w-fit items-center justify-center rounded-md border border-[#2b2116] bg-[#2b2116] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#f5e9d2] transition-colors duration-200 hover:bg-[#f5e9d2] hover:text-[#2b2116] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSubmittingComment ? "Posting..." : "Post Comment"}
-              </button>
-              {commentError ? <p className="text-sm text-[#8f1e1c]">{commentError}</p> : null}
-              {commentNotice ? <p className="text-sm text-[#2f5d29]">{commentNotice}</p> : null}
-            </form>
+            {post.allowComments === false ? (
+              <div className="mt-5 rounded-xl border border-[#e2cfb2] bg-[#fcf4e7] p-4">
+                <p className="text-sm font-medium text-[#3f3021]">
+                  Comments are turned off for this post.
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-[#5f4f3b]">
+                  Readers can still view approved comments that were already published, but no new
+                  comments can be submitted.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitComment} className="mt-5 grid gap-3">
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                  className="h-11 rounded-md border border-[#cab18a] bg-white px-3 text-sm outline-none transition focus:border-[#8a6a3f]"
+                  placeholder="Your name"
+                  minLength={2}
+                  maxLength={80}
+                  autoComplete="name"
+                  required
+                />
+                <textarea
+                  value={form.message}
+                  onChange={(event) => setForm((prev) => ({ ...prev, message: event.target.value }))}
+                  className="min-h-[120px] rounded-md border border-[#cab18a] bg-white p-3 text-sm outline-none transition focus:border-[#8a6a3f]"
+                  placeholder="Write your comment"
+                  maxLength={1200}
+                  required
+                />
+                <input
+                  type="text"
+                  value={form.website}
+                  onChange={(event) => setForm((prev) => ({ ...prev, website: event.target.value }))}
+                  className="hidden"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmittingComment}
+                  className="inline-flex h-11 w-fit items-center justify-center rounded-md border border-[#2b2116] bg-[#2b2116] px-5 text-xs font-semibold uppercase tracking-[0.14em] text-[#f5e9d2] transition-colors duration-200 hover:bg-[#f5e9d2] hover:text-[#2b2116] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSubmittingComment ? "Posting..." : "Post Comment"}
+                </button>
+                {commentError ? <p className="text-sm text-[#8f1e1c]">{commentError}</p> : null}
+                {commentNotice ? <p className="text-sm text-[#2f5d29]">{commentNotice}</p> : null}
+              </form>
+            )}
 
             <div className="mt-6 space-y-3">
               {comments.length === 0 ? (
-                <p className="text-sm text-[#5f4f3b]">No comments yet. Be the first to comment.</p>
+                <p className="text-sm text-[#5f4f3b]">
+                  {post.allowComments === false
+                    ? "Comments are closed for this post."
+                    : "No comments yet. Be the first to comment."}
+                </p>
               ) : (
                 comments.map((comment) => (
                   <article key={comment.id} className="rounded-xl border border-[#ddccb0] bg-[#fcf4e7] p-4">

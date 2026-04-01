@@ -1,4 +1,5 @@
 const ALLOWED_TAGS = new Set([
+  "h1",
   "p",
   "br",
   "strong",
@@ -8,6 +9,7 @@ const ALLOWED_TAGS = new Set([
   "u",
   "s",
   "a",
+  "q",
   "ul",
   "ol",
   "li",
@@ -15,6 +17,10 @@ const ALLOWED_TAGS = new Set([
   "h2",
   "h3",
   "h4",
+  "div",
+  "img",
+  "pre",
+  "code",
 ]);
 
 const BLOCKED_TAGS = new Set([
@@ -35,9 +41,14 @@ const BLOCKED_TAGS = new Set([
 ]);
 
 const SAFE_HREF_PATTERN = /^(https?:|mailto:|tel:|\/|#)/i;
+const SAFE_IMAGE_SRC_PATTERN = /^(https?:|data:|\/)/i;
 
 function isSafeHref(href = "") {
   return SAFE_HREF_PATTERN.test(href.trim());
+}
+
+function isSafeImageSrc(src = "") {
+  return SAFE_IMAGE_SRC_PATTERN.test(src.trim());
 }
 
 function normalizeTagName(tagName) {
@@ -45,6 +56,26 @@ function normalizeTagName(tagName) {
   if (lowerTag === "b") return "strong";
   if (lowerTag === "i") return "em";
   return lowerTag;
+}
+
+function normalizeTextAlignment(value = "") {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "start") return "left";
+  if (normalized === "end") return "right";
+  if (normalized === "left" || normalized === "center" || normalized === "right") {
+    return normalized;
+  }
+  return "";
+}
+
+function getSafeTextAlignment(node) {
+  if (!node) return "";
+
+  return (
+    normalizeTextAlignment(node.getAttribute?.("data-align")) ||
+    normalizeTextAlignment(node.getAttribute?.("align")) ||
+    normalizeTextAlignment(node.style?.textAlign)
+  );
 }
 
 function sanitizeElementNode(node, documentRef) {
@@ -73,6 +104,11 @@ function sanitizeElementNode(node, documentRef) {
   }
 
   const nextEl = documentRef.createElement(normalizedTag);
+  const safeTextAlignment = getSafeTextAlignment(node);
+
+  if (safeTextAlignment === "center" || safeTextAlignment === "right") {
+    nextEl.setAttribute("data-align", safeTextAlignment);
+  }
 
   if (normalizedTag === "a") {
     const href = (node.getAttribute("href") || "").trim();
@@ -86,6 +122,17 @@ function sanitizeElementNode(node, documentRef) {
     } else {
       nextEl.setAttribute("href", "#");
     }
+  }
+
+  if (normalizedTag === "img") {
+    const src = (node.getAttribute("src") || "").trim();
+    if (!isSafeImageSrc(src)) {
+      return null;
+    }
+
+    nextEl.setAttribute("src", src);
+    nextEl.setAttribute("alt", (node.getAttribute("alt") || "").trim().slice(0, 160));
+    nextEl.setAttribute("loading", "lazy");
   }
 
   Array.from(node.childNodes).forEach((child) => {
@@ -127,4 +174,12 @@ export function toPlainBlogText(content = "") {
     .replace(/[#*_`>[\]()!-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function hasMeaningfulBlogContent(content = "") {
+  const value = String(content || "");
+  if (!value.trim()) return false;
+
+  const normalized = hasHtmlContent(value) ? sanitizeBlogHtml(value) : value;
+  return Boolean(toPlainBlogText(normalized) || /<img[\s>]/i.test(normalized));
 }

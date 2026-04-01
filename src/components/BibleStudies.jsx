@@ -1,23 +1,33 @@
 import Container from "./ui/Container";
 import { Link } from "react-router-dom";
+import MotionReveal from "./ui/MotionReveal";
 import { bibleStudies } from "../data/bibleStudies";
 
 export default function BibleStudies() {
   return (
     <section id="spirituality" className="bg-[#f3f3f3] text-black">
       <Container className="py-14 md:py-20">
-        <h2 className="text-[35px] font-extrabold uppercase tracking-tight">
-          SPIRITUALITY
-        </h2>
-        <p className="mt-3 max-w-2xl text-md text-black/70">
-          Gather, grow, and go deeper together.
-        </p>
+        <MotionReveal delay={40} distance={28}>
+          <h2 className="text-[35px] font-extrabold uppercase tracking-tight">
+            SPIRITUALITY
+          </h2>
+          <p className="mt-3 max-w-2xl text-md text-black/70">
+            Gather, grow, and go deeper together.
+          </p>
+        </MotionReveal>
 
-        <div className="mt-12 overflow-hidden rounded-2xl border border-black/15 bg-white shadow-[0_30px_70px_-45px_rgba(0,0,0,0.5)]">
+        <MotionReveal
+          delay={120}
+          distance={34}
+          className="mt-12 overflow-hidden rounded-2xl border border-black/15 bg-white shadow-[0_30px_70px_-45px_rgba(0,0,0,0.5)]"
+        >
           <div className="grid grid-cols-1 lg:grid-cols-3">
-            {bibleStudies.map((study) => (
-              <article
+            {bibleStudies.map((study, index) => (
+              <MotionReveal
                 key={study.key}
+                as="article"
+                delay={180 + index * 100}
+                distance={24}
                 className={`group relative flex min-h-[280px] flex-col border-b border-black/10 bg-gradient-to-b from-white to-[#fcfcfc] p-8 transition-colors duration-300 hover:from-[#fffdf8] hover:to-white lg:border-b-0 lg:border-r lg:p-10 last:border-r-0 ${
                   study.key === "pray-together"
                     ? "lg:min-h-[380px]"
@@ -64,10 +74,10 @@ export default function BibleStudies() {
                     </a>
                   ) : null}
                 </div>
-              </article>
+              </MotionReveal>
             ))}
           </div>
-        </div>
+        </MotionReveal>
       </Container>
     </section>
   );

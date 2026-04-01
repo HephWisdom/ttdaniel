@@ -165,3 +165,104 @@ create policy "Authenticated delete blog images"
 4. Delete the post.
 5. Open public pages (`/#blog`, `/blog`, `/blog/:id`) and confirm read access still works when signed out.
 6. Add a comment on a post while signed out.
+
+## 7) Blog subscribers
+Run the migration in [supabase/migrations/20260325_blog_subscribers.sql](/home/wisdom/Desktop/ttdanielportfolio/supabase/migrations/20260325_blog_subscribers.sql).
+
+If you prefer to paste SQL manually, run this in Supabase SQL Editor:
+
+```sql
+create extension if not exists pgcrypto;
+
+alter table public.blog_posts
+  add column if not exists subscriber_notified_at timestamptz;
+
+create table if not exists public.blog_subscribers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  email text not null unique,
+  status text not null default 'active' check (status in ('active', 'unsubscribed')),
+  source text not null default 'website',
+  created_at timestamptz not null default now(),
+  unsubscribed_at timestamptz,
+  check (char_length(name) between 2 and 80),
+  check (char_length(email) between 5 and 160),
+  check (email = lower(email))
+);
+
+create index if not exists idx_blog_subscribers_status_created_at
+  on public.blog_subscribers(status, created_at desc);
+
+alter table public.blog_subscribers enable row level security;
+
+drop policy if exists "Public insert blog subscribers" on public.blog_subscribers;
+create policy "Public insert blog subscribers"
+  on public.blog_subscribers
+  for insert
+  to anon, authenticated
+  with check (
+    status = 'active'
+    and source = 'website'
+    and email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$'
+  );
+```
+
+Notes:
+- No public `select` policy is added for `blog_subscribers`, so the subscriber list stays private.
+- The website stores emails in lowercase and rejects duplicates with the table unique constraint.
+
+## 8) Subscriber email functions
+This repo now includes:
+- [supabase/functions/subscribe-to-blog/index.ts](/home/wisdom/Desktop/ttdanielportfolio/supabase/functions/subscribe-to-blog/index.ts) for public signup + confirmation email.
+- [supabase/functions/broadcast-blog-post/index.ts](/home/wisdom/Desktop/ttdanielportfolio/supabase/functions/broadcast-blog-post/index.ts) for admin publish broadcasts.
+
+### Free-tier mode
+If you only want to use Supabase free-tier storage for subscriptions:
+- Run the `blog_subscribers` migration.
+- Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- Do not deploy any subscriber functions yet.
+
+Behavior in free-tier mode:
+- Visitors can subscribe from the website.
+- Their name and email are stored directly in `public.blog_subscribers`.
+- No confirmation email is sent.
+- Admin publish broadcasts will still require the optional `broadcast-blog-post` function.
+
+Note:
+- The current website subscription flow is now configured to require the confirmation-email function.
+- If you want the public subscribe button to work, deploy `subscribe-to-blog` and configure Resend.
+
+### Optional email-enabled mode
+If you also want confirmation emails and subscriber broadcasts, set these Supabase function secrets before deployment:
+
+Recommended free-tier option:
+- Use a Resend free account for confirmation emails.
+- Verify a sending domain in Resend and use a sender address on that domain for `BLOG_EMAIL_FROM`.
+- Keep using Supabase Edge Functions for the subscription endpoint.
+
+```bash
+supabase secrets set RESEND_API_KEY=YOUR_RESEND_API_KEY
+supabase secrets set BLOG_EMAIL_FROM="TT Daniel <updates@yourdomain.com>"
+supabase secrets set SITE_URL=https://yourdomain.com
+supabase secrets set BLOG_ADMIN_EMAIL=your-admin@email.com
+```
+
+Deploy both functions:
+
+```bash
+supabase functions deploy subscribe-to-blog
+supabase functions deploy broadcast-blog-post
+```
+
+JWT note:
+- `subscribe-to-blog` is a public website endpoint and should be deployed with JWT verification disabled.
+- This repo now includes [supabase/config.toml](/home/wisdom/Desktop/ttdanielportfolio/supabase/config.toml) with `verify_jwt = false` for `subscribe-to-blog` and `verify_jwt = true` for `broadcast-blog-post`.
+- If you deployed `subscribe-to-blog` before adding this config, redeploy it.
+
+Behavior:
+- Visitors click the `Subscribe` button beside `View All Blog Posts` and fill the popup form.
+- `subscribe-to-blog` sends the confirmation email immediately after a successful subscription.
+- If the function is missing or email delivery fails, the website shows an error instead of pretending the subscription is complete.
+- When you publish from `/admin/blog`, you can keep the "Email subscribers after publish" option on.
+- Immediate publishes can email the subscriber list through Resend.
+- Scheduled posts are saved normally, but they are not emailed automatically by this setup.

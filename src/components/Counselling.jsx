@@ -1,9 +1,26 @@
+import { useMemo } from "react";
 import Container from "./ui/Container";
+import MotionReveal from "./ui/MotionReveal";
 import one_on_one from "../assets/one-on-one.jpg";
 import family from "../assets/Counseling Center.png";
 import free_session from "../assets/free-session.png";
 
+function getUserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+function detectAfricaTimezone(timezone) {
+  return timezone.startsWith("Africa/");
+}
+
 export default function Counselling() {
+  const userTimezone = useMemo(() => getUserTimezone(), []);
+  const isAfricaUser = useMemo(() => detectAfricaTimezone(userTimezone), [userTimezone]);
+
   const cards = [
     {
       key: "free-intro",
@@ -12,7 +29,7 @@ export default function Counselling() {
       desc: "A free first session to understand your needs, ask questions, and plan the right next step.",
       img: free_session,
       cta: "Schedule Now",
-      link: "https://calendly.com/ttdanielplus/15min",
+      globalLink: "https://calendly.com/ttdanielplus/15min",
     },
     {
       key: "individual",
@@ -21,7 +38,8 @@ export default function Counselling() {
       desc: "Private, focused sessions to explore personal challenges, growth and healing.",
       img: one_on_one,
       cta: "Book Now",
-      link: "https://calendly.com/ttdanielplus/private-talk-with-tt-daniel",
+      globalLink: "https://calendly.com/ttdanielplus/private-talk-with-tt-daniel",
+      africaLink: "https://paystack.com/buy/one-on-one-counseling-kcwznh",
     },
     {
       key: "family",
@@ -30,7 +48,8 @@ export default function Counselling() {
       desc: "Guided family sessions to improve communication, resolve conflict and create connection.",
       img: family,
       cta: "Book Now",
-      link: "https://calendly.com/ttdanielplus/family-counseling-with-tt-daniel",
+      globalLink: "https://calendly.com/ttdanielplus/family-counseling-with-tt-daniel",
+      africaLink: "https://paystack.com/buy/family-counseling-imkeke",
     },
   ];
 
@@ -46,17 +65,26 @@ export default function Counselling() {
       </div>
 
       <Container className="py-14 md:py-20">
-        <h2 className="text-[35px] font-extrabold uppercase tracking-tight text-white">
-          Counseling
-        </h2>
-        <p className="mt-3 max-w-2xl text-md text-white/75">
-          A calm and intentional space for healing, clarity, and restored direction.
-        </p>
+        <MotionReveal delay={40} distance={28}>
+          <h2 className="text-[35px] font-extrabold uppercase tracking-tight text-white">
+            Counseling
+          </h2>
+          <p className="mt-3 max-w-2xl text-md text-white/75">
+            A calm and intentional space for healing, clarity, and restored direction.
+          </p>
+        </MotionReveal>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
-            {cards.map((c) => (
-              <article
+          {cards.map((c, index) => {
+            const activeLink = isAfricaUser ? c.africaLink || c.globalLink : c.globalLink;
+            const activeCta = isAfricaUser && c.africaLink ? "Pay & Book" : c.cta;
+
+            return (
+              <MotionReveal
                 key={c.key}
+                as="article"
+                delay={100 + index * 100}
+                distance={34}
                 className="group relative min-h-[440px] overflow-hidden rounded-3xl border border-white/20 bg-black/40 shadow-[0_25px_70px_-30px_rgba(0,0,0,0.7)] backdrop-blur-sm"
               >
                 <div className="absolute inset-0">
@@ -82,14 +110,14 @@ export default function Counselling() {
                     {c.desc}
                   </p>
 
-                  {c.link ? (
+                  {activeLink ? (
                     <a
-                      href={c.link}
+                      href={activeLink}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-7 inline-flex w-fit items-center border border-[#d4b06f]/70 bg-black/50 px-5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d7a5] transition hover:bg-[#d4b06f]/20"
                     >
-                      {c.cta}
+                      {activeCta}
                     </a>
                   ) : (
                     <div className="mt-7 inline-flex w-fit items-center border border-[#d4b06f]/70 bg-black/50 px-5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d7a5]">
@@ -97,8 +125,9 @@ export default function Counselling() {
                     </div>
                   )}
                 </div>
-              </article>
-            ))}
+              </MotionReveal>
+            );
+          })}
         </div>
       </Container>
     </section>

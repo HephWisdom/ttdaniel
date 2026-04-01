@@ -63,50 +63,50 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen bg-[#d3d3d3]">
+    <section className="min-h-screen bg-[#d3d3d3]" data-analytics-section="home">
       <Container className="h-full max-w-none px-0">
         <div className="min-h-screen w-full bg-[#ececec] px-6 py-6 sm:px-10 sm:py-8 lg:px-12 lg:py-10">
           <div className="grid items-start gap-8 lg:grid-cols-[1fr_1fr] lg:gap-4">
             <div className="flex w-full items-start justify-center">
-            <div
-              className="mt-0 pt-2 lg:pt-4"
-              onMouseMove={handleHeadingMouseMove}
-              onMouseLeave={handleHeadingMouseLeave}
-            >
+              <div
+                className="mt-0 pt-2 lg:pt-4"
+                onMouseMove={handleHeadingMouseMove}
+                onMouseLeave={handleHeadingMouseLeave}
+              >
             <h1 className="mx-auto max-w-[12ch] text-center font-serif text-[clamp(3rem,8.8vw,8.6rem)] leading-[0.8] tracking-[-0.02em] text-black">
-              {HEADING_SEGMENTS.map((segment, segmentIndex) => (
-                <span key={`${segment.text}-${segmentIndex}`}>
-                  {segment.breakBefore ? <br /> : null}
-                  <span
-                    className={`whitespace-nowrap ${segment.italic ? "italic" : ""}`}
-                  >
-                    {segment.text.split("").map((char, charIndex) => {
-                      const isSpace = char === " ";
-                      const key = `${segmentIndex}-${charIndex}`;
-                      const charsBefore = segment.text
-                        .slice(0, charIndex)
-                        .replaceAll(" ", "").length;
-                      const currentLetterIndex =
-                        SEGMENT_BASE_INDEX[segmentIndex] + charsBefore;
-                      return isSpace ? (
-                        <span key={key}> </span>
-                      ) : (
-                        <span
-                          key={key}
-                          ref={(node) => {
-                            letterRefs.current[currentLetterIndex] = node;
-                          }}
-                          className="inline-block transition-transform duration-200 ease-out"
-                        >
-                          {char}
-                        </span>
-                      );
-                    })}
-                  </span>
-                </span>
-              ))}
-            </h1>
-          </div>
+                  {HEADING_SEGMENTS.map((segment, segmentIndex) => (
+                    <span key={`${segment.text}-${segmentIndex}`}>
+                      {segment.breakBefore ? <br /> : null}
+                      <span
+                        className={`whitespace-nowrap ${segment.italic ? "italic" : ""}`}
+                      >
+                        {segment.text.split("").map((char, charIndex) => {
+                          const isSpace = char === " ";
+                          const key = `${segmentIndex}-${charIndex}`;
+                          const charsBefore = segment.text
+                            .slice(0, charIndex)
+                            .replaceAll(" ", "").length;
+                          const currentLetterIndex =
+                            SEGMENT_BASE_INDEX[segmentIndex] + charsBefore;
+                          return isSpace ? (
+                            <span key={key}> </span>
+                          ) : (
+                            <span
+                              key={key}
+                              ref={(node) => {
+                                letterRefs.current[currentLetterIndex] = node;
+                              }}
+                              className="inline-block transition-transform duration-200 ease-out"
+                            >
+                              {char}
+                            </span>
+                          );
+                        })}
+                      </span>
+                    </span>
+                  ))}
+                </h1>
+              </div>
             </div>
 
             <div className="order-last lg:order-none lg:justify-self-stretch">
@@ -120,7 +120,6 @@ export default function Hero() {
               </div>
             </div>
           </div>
-
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-end">
             <div className="max-w-[35rem]">
@@ -141,12 +140,12 @@ export default function Hero() {
                       className="block basis-1/3 shrink-0 overflow-hidden bg-[#e4e4e4]"
                       aria-label="Open gallery"
                     >
-                  <img
-                    src={image}
-                    alt="Gallery thumbnail"
-                    className="h-28 w-full object-cover grayscale transition-all duration-1000 ease-out hover:scale-105 hover:grayscale-0 sm:h-40"
-                    loading="lazy"
-                  />
+                      <img
+                        src={image}
+                        alt="Gallery thumbnail"
+                        className="h-28 w-full object-cover grayscale transition-all duration-1000 ease-out hover:scale-105 hover:grayscale-0 sm:h-40"
+                        loading="lazy"
+                      />
                     </Link>
                   ))}
                 </div>
@@ -155,9 +154,10 @@ export default function Hero() {
 
             <div className="max-w-[22rem] justify-self-start text-[10px] uppercase leading-[1.52] tracking-[0.04em] text-black/88 lg:justify-self-end">
               <p>
-                FOR WE ARE HIS WORKMANSHIP, CREATED IN CHRIST JESUS UNTO GOOD
-                WORKS, WHICH GOD HATH BEFORE ORDAINED THAT WE SHOULD WALK IN
-                THEM. EPHESIANS 2:10 (KJV)
+                "Those from among you Shall build the old waste places;
+                You shall raise up the foundations of many generations;
+                And you shall be called the Repairer of the Breach, The Restorer of Streets to Dwell In.<br />
+                (Isaiah 58:12, NKJV)"
               </p>
               <Link
                 to="/gallery"

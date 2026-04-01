@@ -21,19 +21,27 @@ function isMissingApprovedColumnError(error) {
   );
 }
 
-function isMissingLoveReactionsTableError(error) {
-  const message = String(error?.message || "").toLowerCase();
-  return error?.code === "42P01" || message.includes("blog_love_reactions");
-}
-
-function isLoveReactionFallbackError(error) {
+function isMissingBlogPostOptionColumnError(error) {
   const message = String(error?.message || "").toLowerCase();
   return (
-    isMissingLoveReactionsTableError(error) ||
-    message.includes("row-level security") ||
-    message.includes("permission denied") ||
-    message.includes("not allowed")
+    error?.code === "42703" ||
+    message.includes("allow_comments") ||
+    message.includes("is_featured") ||
+    message.includes("seo_enabled")
   );
+}
+
+function stripControlCharacters(value, { preserveNewLines = false } = {}) {
+  return Array.from(String(value || ""))
+    .filter((char) => {
+      if (preserveNewLines && (char === "\n" || char === "\r")) {
+        return true;
+      }
+
+      const code = char.charCodeAt(0);
+      return code >= 32 && code !== 127;
+    })
+    .join("");
 }
 
 function sanitizeCommentText(value, maxLength, { preserveNewLines = false } = {}) {
@@ -41,7 +49,7 @@ function sanitizeCommentText(value, maxLength, { preserveNewLines = false } = {}
 
   let sanitized = value.normalize("NFKC");
   sanitized = sanitized.replace(/[<>&]/g, "");
-  sanitized = sanitized.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  sanitized = stripControlCharacters(sanitized, { preserveNewLines });
   sanitized = preserveNewLines
     ? sanitized.replace(/[^\S\r\n]+/g, " ").replace(/\r\n/g, "\n")
     : sanitized.replace(/\s+/g, " ");
@@ -133,6 +141,9 @@ export const INITIAL_BLOG_POSTS = [
     author: "Admin",
     createdAt: "2026-02-16T09:00:00.000Z",
     tags: ["Update", "Ministry"],
+    allowComments: true,
+    isFeatured: false,
+    seoEnabled: true,
   },
 ];
 
@@ -145,7 +156,27 @@ function normalizePost(post) {
     content: post.content,
     author: post.author || "Admin",
     createdAt: post.created_at || post.createdAt,
+    subscriberNotifiedAt:
+      post.subscriber_notified_at || post.subscriberNotifiedAt || null,
     tags: Array.isArray(post.tags) ? post.tags : [],
+    allowComments:
+      typeof post.allow_comments === "boolean"
+        ? post.allow_comments
+        : typeof post.allowComments === "boolean"
+          ? post.allowComments
+          : true,
+    isFeatured:
+      typeof post.is_featured === "boolean"
+        ? post.is_featured
+        : typeof post.isFeatured === "boolean"
+          ? post.isFeatured
+          : false,
+    seoEnabled:
+      typeof post.seo_enabled === "boolean"
+        ? post.seo_enabled
+        : typeof post.seoEnabled === "boolean"
+          ? post.seoEnabled
+          : true,
   };
 }
 
@@ -210,6 +241,11 @@ function saveLocalBlogPosts(posts) {
   window.localStorage.setItem(BLOG_STORAGE_KEY, JSON.stringify(posts));
 }
 
+const BLOG_POST_SELECT_FIELDS =
+  "id,title,image,excerpt,content,author,tags,created_at,subscriber_notified_at,allow_comments,is_featured,seo_enabled";
+const BLOG_POST_SELECT_FIELDS_LEGACY =
+  "id,title,image,excerpt,content,author,tags,created_at,subscriber_notified_at";
+
 function loadLocalCommentsMap() {
   if (typeof window === "undefined") return {};
 
@@ -233,6 +269,25 @@ function saveLocalCommentsMap(commentsMap) {
   window.localStorage.setItem(BLOG_COMMENTS_STORAGE_KEY, JSON.stringify(commentsMap));
 }
 
+function getLocalCommentCountsMap({ approvedOnly = true } = {}) {
+  const commentsMap = loadLocalCommentsMap();
+
+  return Object.values(commentsMap).reduce((counts, list) => {
+    if (!Array.isArray(list)) return counts;
+
+    list.forEach((comment) => {
+      const normalized = normalizeComment(comment);
+      if (!normalized.postId) return;
+      if (approvedOnly && !normalized.approved) return;
+
+      const current = Number(counts[normalized.postId] || 0);
+      counts[normalized.postId] = Number.isFinite(current) ? current + 1 : 1;
+    });
+
+    return counts;
+  }, {});
+}
+
 function loadLocalLoveCountsMap() {
   if (typeof window === "undefined") return {};
 
@@ -251,6 +306,16 @@ function loadLocalLoveCountsMap() {
 function saveLocalLoveCountsMap(countsMap) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(BLOG_LOVE_REACTIONS_COUNT_KEY, JSON.stringify(countsMap));
+}
+
+function getLocalLoveCountsSnapshot() {
+  const countsMap = loadLocalLoveCountsMap();
+
+  return Object.entries(countsMap).reduce((counts, [postId, value]) => {
+    const nextCount = Number(value || 0);
+    counts[postId] = Number.isFinite(nextCount) && nextCount > 0 ? nextCount : 0;
+    return counts;
+  }, {});
 }
 
 function loadLocalLovedPostsMap() {
@@ -287,9 +352,43 @@ function getLoveReactorToken() {
   return nextToken;
 }
 
+async function hashLoveReactorToken(token) {
+  const value = String(token || "").trim();
+  if (!value) return "";
+
+  if (typeof crypto !== "undefined" && crypto.subtle && typeof TextEncoder !== "undefined") {
+    const input = new TextEncoder().encode(value);
+    const digest = await crypto.subtle.digest("SHA-256", input);
+    return Array.from(new Uint8Array(digest))
+      .map((part) => part.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
+  let hashA = 0x811c9dc5;
+  let hashB = 0x9e3779b9;
+  let hashC = 0x85ebca6b;
+  let hashD = 0xc2b2ae35;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    hashA = Math.imul(hashA ^ code, 0x01000193) >>> 0;
+    hashB = Math.imul(hashB ^ code, 0x85ebca77) >>> 0;
+    hashC = Math.imul(hashC ^ code, 0xc2b2ae3d) >>> 0;
+    hashD = Math.imul(hashD ^ code, 0x27d4eb2f) >>> 0;
+  }
+
+  return [hashA, hashB, hashC, hashD, hashA ^ hashC, hashB ^ hashD, hashA ^ hashD, hashB ^ hashC]
+    .map((part) => (part >>> 0).toString(16).padStart(8, "0"))
+    .join("");
+}
+
 function emitLoveReactionSignal() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(BLOG_LOVE_REACTION_SIGNAL_KEY, String(Date.now()));
+}
+
+export function getBlogLoveReactionSignalKey() {
+  return BLOG_LOVE_REACTION_SIGNAL_KEY;
 }
 
 function getLocalLoveStats(postId) {
@@ -304,9 +403,13 @@ function getLocalLoveStats(postId) {
 }
 
 export function sortBlogPosts(posts) {
-  return [...posts].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  return [...posts].sort((a, b) => {
+    if (Boolean(a.isFeatured) !== Boolean(b.isFeatured)) {
+      return a.isFeatured ? -1 : 1;
+    }
+
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 export function formatBlogDate(value) {
@@ -340,14 +443,27 @@ export async function fetchBlogPosts() {
 
   const { data, error } = await supabase
     .from("blog_posts")
-    .select("id,title,image,excerpt,content,author,tags,created_at")
+    .select(BLOG_POST_SELECT_FIELDS)
     .order("created_at", { ascending: false });
 
-  if (error) {
+  if (!error) {
+    return Array.isArray(data) ? data.map(normalizePost) : [];
+  }
+
+  if (!isMissingBlogPostOptionColumnError(error)) {
     throw new Error(error.message);
   }
 
-  return Array.isArray(data) ? data.map(normalizePost) : [];
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("blog_posts")
+    .select(BLOG_POST_SELECT_FIELDS_LEGACY)
+    .order("created_at", { ascending: false });
+
+  if (legacyError) {
+    throw new Error(legacyError.message);
+  }
+
+  return Array.isArray(legacyData) ? legacyData.map(normalizePost) : [];
 }
 
 export async function fetchPublishedBlogPosts() {
@@ -364,15 +480,29 @@ export async function fetchBlogPostById(postId) {
 
   const { data, error } = await supabase
     .from("blog_posts")
-    .select("id,title,image,excerpt,content,author,tags,created_at")
+    .select(BLOG_POST_SELECT_FIELDS)
     .eq("id", postId)
     .maybeSingle();
 
-  if (error) {
+  if (!error) {
+    return data ? normalizePost(data) : null;
+  }
+
+  if (!isMissingBlogPostOptionColumnError(error)) {
     throw new Error(error.message);
   }
 
-  return data ? normalizePost(data) : null;
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("blog_posts")
+    .select(BLOG_POST_SELECT_FIELDS_LEGACY)
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (legacyError) {
+    throw new Error(legacyError.message);
+  }
+
+  return legacyData ? normalizePost(legacyData) : null;
 }
 
 export async function fetchPublishedBlogPostById(postId) {
@@ -391,6 +521,9 @@ export async function createBlogPost(input) {
     author: input.author?.trim() || "Admin",
     tags: Array.isArray(input.tags) ? input.tags : [],
     created_at: publishAtIso || new Date().toISOString(),
+    allow_comments: input.allowComments !== false,
+    is_featured: input.isFeatured === true,
+    seo_enabled: input.seoEnabled !== false,
   };
 
   if (!isSupabaseConfigured || !supabase) {
@@ -403,6 +536,10 @@ export async function createBlogPost(input) {
       author: payload.author,
       tags: payload.tags,
       createdAt: payload.created_at,
+      subscriberNotifiedAt: null,
+      allowComments: payload.allow_comments,
+      isFeatured: payload.is_featured,
+      seoEnabled: payload.seo_enabled,
     };
     const posts = [nextPost, ...loadLocalBlogPosts()];
     saveLocalBlogPosts(posts);
@@ -412,20 +549,44 @@ export async function createBlogPost(input) {
   const { data, error } = await supabase
     .from("blog_posts")
     .insert(payload)
-    .select("id,title,image,excerpt,content,author,tags,created_at")
+    .select(BLOG_POST_SELECT_FIELDS)
     .maybeSingle();
 
-  if (error) {
+  if (!error && data) {
+    return normalizePost(data);
+  }
+
+  if (error && !isMissingBlogPostOptionColumnError(error)) {
     throw new Error(error.message);
   }
 
-  if (!data) {
+  const legacyPayload = {
+    title: payload.title,
+    image: payload.image,
+    excerpt: payload.excerpt,
+    content: payload.content,
+    author: payload.author,
+    tags: payload.tags,
+    created_at: payload.created_at,
+  };
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("blog_posts")
+    .insert(legacyPayload)
+    .select(BLOG_POST_SELECT_FIELDS_LEGACY)
+    .maybeSingle();
+
+  if (legacyError) {
+    throw new Error(legacyError.message);
+  }
+
+  if (!legacyData) {
     throw new Error(
       "Post was created but no row was returned. Check RLS/select policy on blog_posts."
     );
   }
 
-  return normalizePost(data);
+  return normalizePost(legacyData);
 }
 
 export async function updateBlogPost(postId, input) {
@@ -442,6 +603,9 @@ export async function updateBlogPost(postId, input) {
     author: input.author?.trim() || "Admin",
     tags: Array.isArray(input.tags) ? input.tags : [],
     created_at: publishAtIso || new Date().toISOString(),
+    allow_comments: input.allowComments !== false,
+    is_featured: input.isFeatured === true,
+    seo_enabled: input.seoEnabled !== false,
   };
 
   if (!isSupabaseConfigured || !supabase) {
@@ -460,6 +624,10 @@ export async function updateBlogPost(postId, input) {
       author: payload.author,
       tags: payload.tags,
       createdAt: payload.created_at,
+      subscriberNotifiedAt: posts[index]?.subscriberNotifiedAt || null,
+      allowComments: payload.allow_comments,
+      isFeatured: payload.is_featured,
+      seoEnabled: payload.seo_enabled,
     };
     const nextPosts = [...posts];
     nextPosts[index] = updated;
@@ -471,20 +639,45 @@ export async function updateBlogPost(postId, input) {
     .from("blog_posts")
     .update(payload)
     .eq("id", postId)
-    .select("id,title,image,excerpt,content,author,tags,created_at")
+    .select(BLOG_POST_SELECT_FIELDS)
     .maybeSingle();
 
-  if (error) {
+  if (!error && data) {
+    return normalizePost(data);
+  }
+
+  if (error && !isMissingBlogPostOptionColumnError(error)) {
     throw new Error(error.message);
   }
 
-  if (!data) {
+  const legacyPayload = {
+    title: payload.title,
+    image: payload.image,
+    excerpt: payload.excerpt,
+    content: payload.content,
+    author: payload.author,
+    tags: payload.tags,
+    created_at: payload.created_at,
+  };
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("blog_posts")
+    .update(legacyPayload)
+    .eq("id", postId)
+    .select(BLOG_POST_SELECT_FIELDS_LEGACY)
+    .maybeSingle();
+
+  if (legacyError) {
+    throw new Error(legacyError.message);
+  }
+
+  if (!legacyData) {
     throw new Error(
       "Update returned no row. The post may not exist, or RLS/select policy is blocking return data."
     );
   }
 
-  return normalizePost(data);
+  return normalizePost(legacyData);
 }
 
 export async function deleteBlogPost(postId) {
@@ -554,6 +747,11 @@ export async function fetchCommentsByPostId(postId, options = {}) {
 export async function createBlogComment(postId, input) {
   if (!postId) {
     throw new Error("Missing post id.");
+  }
+
+  const targetPost = await fetchBlogPostById(postId);
+  if (targetPost?.allowComments === false) {
+    throw new Error("Comments are disabled for this post.");
   }
 
   enforceCommentRateLimit();
@@ -646,6 +844,90 @@ export async function fetchPendingBlogComments() {
   }
 
   return Array.isArray(data) ? data.map(normalizeComment) : [];
+}
+
+export async function fetchBlogCommentCounts({ approvedOnly = true } = {}) {
+  if (!isSupabaseConfigured || !supabase) {
+    return getLocalCommentCountsMap({ approvedOnly });
+  }
+
+  let query = supabase.from("blog_comments").select("post_id,is_approved");
+
+  if (approvedOnly) {
+    query = query.eq("is_approved", true);
+  }
+
+  const { data, error } = await query;
+
+  if (!error) {
+    return (Array.isArray(data) ? data : []).reduce((counts, row) => {
+      const postId = row.post_id;
+      if (!postId) return counts;
+
+      const current = Number(counts[postId] || 0);
+      counts[postId] = Number.isFinite(current) ? current + 1 : 1;
+      return counts;
+    }, {});
+  }
+
+  if (!isMissingApprovedColumnError(error)) {
+    throw new Error(error.message);
+  }
+
+  const { data: legacyData, error: legacyError } = await supabase
+    .from("blog_comments")
+    .select("post_id");
+
+  if (legacyError) {
+    throw new Error(legacyError.message);
+  }
+
+  return (Array.isArray(legacyData) ? legacyData : []).reduce((counts, row) => {
+    const postId = row.post_id;
+    if (!postId) return counts;
+
+    const current = Number(counts[postId] || 0);
+    counts[postId] = Number.isFinite(current) ? current + 1 : 1;
+    return counts;
+  }, {});
+}
+
+export async function fetchBlogLoveCounts() {
+  if (!isSupabaseConfigured || !supabase) {
+    return getLocalLoveCountsSnapshot();
+  }
+
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_blog_love_reaction_counts");
+
+    if (!rpcError) {
+      return (Array.isArray(rpcData) ? rpcData : []).reduce((counts, row) => {
+        const postId = row.post_id;
+        if (!postId) return counts;
+
+        const nextCount = Number(row.reaction_count || 0);
+        counts[postId] = Number.isFinite(nextCount) ? nextCount : 0;
+        return counts;
+      }, {});
+    }
+
+    const { data, error } = await supabase.from("blog_love_reactions").select("post_id");
+
+    if (error || rpcError) {
+      return getLocalLoveCountsSnapshot();
+    }
+
+    return (Array.isArray(data) ? data : []).reduce((counts, row) => {
+      const postId = row.post_id;
+      if (!postId) return counts;
+
+      const current = Number(counts[postId] || 0);
+      counts[postId] = Number.isFinite(current) ? current + 1 : 1;
+      return counts;
+    }, {});
+  } catch {
+    return getLocalLoveCountsSnapshot();
+  }
 }
 
 export async function approveBlogComment(commentId) {
@@ -765,34 +1047,47 @@ export async function fetchBlogLoveStats(postId) {
     return getLocalLoveStats(postId);
   }
 
-  const reactorToken = getLoveReactorToken();
+  try {
+    const reactorToken = getLoveReactorToken();
+    const reactorTokenHash = await hashLoveReactorToken(reactorToken);
+    const { data: rpcData, error: rpcError } = await supabase.rpc("get_blog_love_reaction_stats", {
+      target_post_id: postId,
+      target_reactor_hash: reactorTokenHash,
+    });
 
-  const [{ count, error: countError }, { data: reactedData, error: reactedError }] =
-    await Promise.all([
-      supabase
-        .from("blog_love_reactions")
-        .select("id", { count: "exact", head: true })
-        .eq("post_id", postId),
-      supabase
-        .from("blog_love_reactions")
-        .select("id")
-        .eq("post_id", postId)
-        .eq("reactor_token", reactorToken)
-        .limit(1),
-    ]);
+    if (!rpcError) {
+      const row = Array.isArray(rpcData) ? rpcData[0] : rpcData;
+      return {
+        count: Number.isFinite(Number(row?.reaction_count)) ? Number(row.reaction_count) : 0,
+        hasReacted: Boolean(row?.has_reacted),
+      };
+    }
 
-  if (countError || reactedError) {
-    const mergedError = countError || reactedError;
-    if (isLoveReactionFallbackError(mergedError)) {
+    const [{ count, error: countError }, { data: reactedData, error: reactedError }] =
+      await Promise.all([
+        supabase
+          .from("blog_love_reactions")
+          .select("id", { count: "exact", head: true })
+          .eq("post_id", postId),
+        supabase
+          .from("blog_love_reactions")
+          .select("id")
+          .eq("post_id", postId)
+          .eq("reactor_token", reactorToken)
+          .limit(1),
+      ]);
+
+    if (countError || reactedError || rpcError) {
       return getLocalLoveStats(postId);
     }
-    throw new Error(mergedError.message || "Unable to load love reactions.");
-  }
 
-  return {
-    count: Number.isFinite(Number(count)) ? Number(count) : 0,
-    hasReacted: Array.isArray(reactedData) && reactedData.length > 0,
-  };
+    return {
+      count: Number.isFinite(Number(count)) ? Number(count) : 0,
+      hasReacted: Array.isArray(reactedData) && reactedData.length > 0,
+    };
+  } catch {
+    return getLocalLoveStats(postId);
+  }
 }
 
 export async function addBlogLoveReaction(postId) {
@@ -814,57 +1109,56 @@ export async function addBlogLoveReaction(postId) {
     return getLocalLoveStats(postId);
   }
 
-  const reactorToken = getLoveReactorToken();
-  const { data: existing, error: existingError } = await supabase
-    .from("blog_love_reactions")
-    .select("id")
-    .eq("post_id", postId)
-    .eq("reactor_token", reactorToken)
-    .limit(1);
-
-  if (existingError) {
-    if (isLoveReactionFallbackError(existingError)) {
-      const countsMap = loadLocalLoveCountsMap();
-      const lovedPostsMap = loadLocalLovedPostsMap();
-      if (!lovedPostsMap[postId]) {
-        const current = Number(countsMap[postId] || 0);
-        countsMap[postId] = Number.isFinite(current) && current > 0 ? current + 1 : 1;
-        lovedPostsMap[postId] = true;
-        saveLocalLoveCountsMap(countsMap);
-        saveLocalLovedPostsMap(lovedPostsMap);
-        emitLoveReactionSignal();
-      }
-      return getLocalLoveStats(postId);
-    }
-    throw new Error(existingError.message || "Unable to submit love reaction.");
-  }
-
-  if (!Array.isArray(existing) || existing.length === 0) {
-    const { error: insertError } = await supabase.from("blog_love_reactions").insert({
-      post_id: postId,
-      reactor_token: reactorToken,
+  try {
+    const reactorToken = getLoveReactorToken();
+    const reactorTokenHash = await hashLoveReactorToken(reactorToken);
+    const { error: rpcError } = await supabase.rpc("add_blog_love_reaction", {
+      target_post_id: postId,
+      target_reactor_hash: reactorTokenHash,
     });
 
-    if (insertError) {
-      if (isLoveReactionFallbackError(insertError)) {
-        const countsMap = loadLocalLoveCountsMap();
-        const lovedPostsMap = loadLocalLovedPostsMap();
-        if (!lovedPostsMap[postId]) {
-          const current = Number(countsMap[postId] || 0);
-          countsMap[postId] = Number.isFinite(current) && current > 0 ? current + 1 : 1;
-          lovedPostsMap[postId] = true;
-          saveLocalLoveCountsMap(countsMap);
-          saveLocalLovedPostsMap(lovedPostsMap);
-          emitLoveReactionSignal();
-        }
-        return getLocalLoveStats(postId);
-      }
-      throw new Error(insertError.message || "Unable to submit love reaction.");
+    if (!rpcError) {
+      emitLoveReactionSignal();
+      return fetchBlogLoveStats(postId);
     }
-  }
 
-  emitLoveReactionSignal();
-  return fetchBlogLoveStats(postId);
+    const { data: existing, error: existingError } = await supabase
+      .from("blog_love_reactions")
+      .select("id")
+      .eq("post_id", postId)
+      .eq("reactor_token", reactorToken)
+      .limit(1);
+
+    if (existingError || rpcError) {
+      throw existingError || rpcError;
+    }
+
+    if (!Array.isArray(existing) || existing.length === 0) {
+      const { error: insertError } = await supabase.from("blog_love_reactions").insert({
+        post_id: postId,
+        reactor_token: reactorToken,
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+    }
+
+    emitLoveReactionSignal();
+    return fetchBlogLoveStats(postId);
+  } catch {
+    const countsMap = loadLocalLoveCountsMap();
+    const lovedPostsMap = loadLocalLovedPostsMap();
+    if (!lovedPostsMap[postId]) {
+      const current = Number(countsMap[postId] || 0);
+      countsMap[postId] = Number.isFinite(current) && current > 0 ? current + 1 : 1;
+      lovedPostsMap[postId] = true;
+      saveLocalLoveCountsMap(countsMap);
+      saveLocalLovedPostsMap(lovedPostsMap);
+      emitLoveReactionSignal();
+    }
+    return getLocalLoveStats(postId);
+  }
 }
 
 export async function removeBlogLoveReaction(postId) {
@@ -886,32 +1180,44 @@ export async function removeBlogLoveReaction(postId) {
     return getLocalLoveStats(postId);
   }
 
-  const reactorToken = getLoveReactorToken();
-  const { error } = await supabase
-    .from("blog_love_reactions")
-    .delete()
-    .eq("post_id", postId)
-    .eq("reactor_token", reactorToken);
+  try {
+    const reactorToken = getLoveReactorToken();
+    const reactorTokenHash = await hashLoveReactorToken(reactorToken);
+    const { error: rpcError } = await supabase.rpc("remove_blog_love_reaction", {
+      target_post_id: postId,
+      target_reactor_hash: reactorTokenHash,
+    });
 
-  if (error) {
-    if (isLoveReactionFallbackError(error)) {
-      const countsMap = loadLocalLoveCountsMap();
-      const lovedPostsMap = loadLocalLovedPostsMap();
-      if (lovedPostsMap[postId]) {
-        const current = Number(countsMap[postId] || 0);
-        countsMap[postId] = Math.max(0, Number.isFinite(current) ? current - 1 : 0);
-        delete lovedPostsMap[postId];
-        saveLocalLoveCountsMap(countsMap);
-        saveLocalLovedPostsMap(lovedPostsMap);
-        emitLoveReactionSignal();
-      }
-      return getLocalLoveStats(postId);
+    if (!rpcError) {
+      emitLoveReactionSignal();
+      return fetchBlogLoveStats(postId);
     }
-    throw new Error(error.message || "Unable to remove love reaction.");
-  }
 
-  emitLoveReactionSignal();
-  return fetchBlogLoveStats(postId);
+    const { error } = await supabase
+      .from("blog_love_reactions")
+      .delete()
+      .eq("post_id", postId)
+      .eq("reactor_token", reactorToken);
+
+    if (error || rpcError) {
+      throw error || rpcError;
+    }
+
+    emitLoveReactionSignal();
+    return fetchBlogLoveStats(postId);
+  } catch {
+    const countsMap = loadLocalLoveCountsMap();
+    const lovedPostsMap = loadLocalLovedPostsMap();
+    if (lovedPostsMap[postId]) {
+      const current = Number(countsMap[postId] || 0);
+      countsMap[postId] = Math.max(0, Number.isFinite(current) ? current - 1 : 0);
+      delete lovedPostsMap[postId];
+      saveLocalLoveCountsMap(countsMap);
+      saveLocalLovedPostsMap(lovedPostsMap);
+      emitLoveReactionSignal();
+    }
+    return getLocalLoveStats(postId);
+  }
 }
 
 export function isUsingSupabase() {

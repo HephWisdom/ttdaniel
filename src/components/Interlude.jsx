@@ -1,5 +1,6 @@
 import Container from "./ui/Container";
 import { Link } from "react-router-dom";
+import MotionReveal from "./ui/MotionReveal";
 
 import portrait from "../assets/tt daniel.jpeg"
 
@@ -30,12 +31,12 @@ export default function AboutInterludeExact() {
         <div className="grid md:grid-cols-12 gap-10">
 
           {/* LEFT COLUMN */}
-          <div className="md:col-span-6">
+          <MotionReveal as="div" delay={40} distance={36} className="md:col-span-6">
             <h2 className="text-3xl font-extrabold tracking-tight md:text-4xl">
               TT Daniel - <em className="italic font-serif">The Revivalist</em>
             </h2>
 
-            <ul className="mt-8 max-w-md list-disc space-y-5 pl-5 text-sm leading-relaxed text-white/80">
+            <ul className="mt-8 max-w-md list-disc space-y-5 pl-5 text-md leading-relaxed text-white/80">
               <li>
                 TT Daniel is a vsionary faith-based leader, strategic organizer, a life coach with experience founding and leading organizations, training high-performing teams, individuals and executing large-scale community programs while driving operational excellence and stakeholder engagement.
 
@@ -77,10 +78,15 @@ Well-versed in data-driven & intuitive decision-making, corporate training, and 
                 <span aria-hidden="true">→</span>
               </Link>
             </div>
-          </div>
+          </MotionReveal>
 
           {/* RIGHT COLUMN (portrait + mantra) */}
-          <div className="md:col-span-6 relative">
+          <MotionReveal
+            as="div"
+            delay={180}
+            distance={48}
+            className="relative md:col-span-6"
+          >
             <div
               className="
                 relative z-10
@@ -109,31 +115,18 @@ Well-versed in data-driven & intuitive decision-making, corporate training, and 
                   </div>
                 </div>
 
-                {/* MANTRA — face-safe, bottom anchored */}
-                <div className="pointer-events-none absolute inset-0 z-[40] flex items-end justify-start">
-                  <div
-                    className="
-                      bg-white text-black shadow-[0_30px_90px_rgba(0,0,0,0.55)]
-                      px-4 py-4 sm:px-6 sm:py-6 md:px-10 md:py-8
-                      mb-10 sm:mb-12 md:mb-14 lg:mb-16
-                      md:-translate-x-full
-                    "
-                  >
-                    <p className="text-2xl sm:text-2xl md:text-3xl lg:text-4xl font-extrabold leading-none tracking-tight">
-                      APOSTLE
-                      <br /><br />
-                      AUTHOR
-                      <br /><br />
-                      KING
-                      <br /><br />
-                      LIFE COACH
-                    </p>
-                  </div>
-                </div>
+              </div>
 
+              <div className="w-full bg-white px-4 py-4 sm:px-6 sm:py-6 md:px-10 md:py-8">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[clamp(1.05rem,2.4vw,2rem)] font-extrabold uppercase tracking-[0.08em] leading-[1.1] text-black">
+                  <span className="inline-flex items-center gap-2">APOSTLE</span>
+                  <span className="inline-flex items-center gap-2">AUTHOR</span>
+                  <span className="inline-flex items-center gap-2">KING</span>
+                  <span className="inline-flex items-center gap-2">LIFE-COACH</span>
+                </div>
               </div>
             </div>
-          </div>
+          </MotionReveal>
 
         </div>
       </Container>

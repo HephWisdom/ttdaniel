@@ -1,0 +1,8 @@
+[functions.subscribe-to-blog]
+verify_jwt = false
+
+[functions.broadcast-blog-post]
+verify_jwt = true
+
+[functions.list-blog-subscribers]
+verify_jwt = true

@@ -92,7 +92,10 @@ export default function BlogAll() {
   };
 
   return (
-    <section className="min-h-screen bg-[#ebebeb] text-[#0d1117]">
+    <section
+      className="min-h-screen bg-[#ebebeb] text-[#0d1117]"
+      data-analytics-section="blog-archive"
+    >
       <Container className="py-14 md:py-20">
         <div className="mx-auto w-full max-w-6xl">
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#4e5a78]">Blog</p>
@@ -114,7 +117,12 @@ export default function BlogAll() {
                     key={post.id}
                     className="overflow-hidden rounded-[16px] border border-black/10 bg-white shadow-[0_20px_40px_-34px_rgba(0,0,0,0.55)]"
                   >
-                    <Link to={`/blog/${post.id}`} className="block overflow-hidden bg-[#ececec]">
+                    <Link to={`/blog/${post.id}`} className="relative block overflow-hidden bg-[#ececec]">
+                      {post.isFeatured ? (
+                        <span className="absolute left-4 top-4 z-10 inline-flex rounded-full bg-[#0f172a] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_8px_20px_-12px_rgba(15,23,42,0.8)]">
+                          Featured
+                        </span>
+                      ) : null}
                       <img
                         src={post.image || blogFallbackImage}
                         alt={post.title}

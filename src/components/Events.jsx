@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import Container from "./ui/Container";
+import MotionReveal from "./ui/MotionReveal";
 import { featuredEvents } from "../data/events";
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
@@ -80,8 +80,7 @@ export default function Events() {
   }, [activeEvent]);
 
   const renderEventCard = (event, index) => {
-    const ctaLabel = event.isExternal ? "Register now" : "View details";
-    const detailsTarget = event.isExternal ? event.detailsHref : event.detailsHref || "/event-details";
+    const ctaLabel = event.isExternal ? "Register now" : event.details ? "View details" : "Registration link";
     const countdown = getCountdownLabel(event.deadline, now);
     const closed = isEventClosed(event.deadline, now);
     const qrImageSrc = getQrImageSrc(event);
@@ -194,9 +193,9 @@ export default function Events() {
               <span className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-md border border-white/20 bg-[#1a1a1a]/70 px-4 text-sm font-semibold uppercase tracking-[0.1em] text-white/60">
                 Registration closed
               </span>
-            ) : event.isExternal ? (
+            ) : event.detailsHref ? (
               <a
-                href={detailsTarget}
+                href={event.detailsHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#d2b679]/45 bg-[#0f0f10]/85 px-4 text-sm font-semibold uppercase tracking-[0.1em] text-[#f0d9a6] transition hover:border-[#f0d9a6] hover:bg-[#f0d9a6] hover:text-[#111]"
@@ -204,12 +203,9 @@ export default function Events() {
                 {ctaLabel}
               </a>
             ) : (
-              <Link
-                to={detailsTarget}
-                className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#d2b679]/45 bg-[#0f0f10]/85 px-4 text-sm font-semibold uppercase tracking-[0.1em] text-[#f0d9a6] transition hover:border-[#f0d9a6] hover:bg-[#f0d9a6] hover:text-[#111]"
-              >
-                {ctaLabel}
-              </Link>
+              <span className="inline-flex h-11 w-full cursor-not-allowed items-center justify-center rounded-md border border-white/20 bg-[#1a1a1a]/70 px-4 text-sm font-semibold uppercase tracking-[0.1em] text-white/60">
+                Registration link unavailable
+              </span>
             )}
           </div>
         </div>
@@ -256,7 +252,7 @@ export default function Events() {
       </div>
 
       <Container className="relative py-14 md:py-20">
-        <div className="max-w-2xl">
+        <MotionReveal delay={40} distance={30} className="max-w-2xl">
           <h2 className="text-3xl font-extrabold uppercase tracking-tight md:text-5xl">
             Events
           </h2>
@@ -264,10 +260,18 @@ export default function Events() {
           <p className="mt-4 text-sm text-white/75 md:text-base">
             Click on a poster below to view details and complete registration.
           </p>
-        </div>
+        </MotionReveal>
 
         <div className="mt-12 grid items-start gap-7 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedFeaturedEvents.map((event, index) => renderEventCard(event, index))}
+          {sortedFeaturedEvents.map((event, index) => (
+            <MotionReveal
+              key={event.title}
+              delay={90 + index * 90}
+              distance={34}
+            >
+              {renderEventCard(event, index)}
+            </MotionReveal>
+          ))}
         </div>
       </Container>
 

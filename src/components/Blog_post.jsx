@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Container from "./ui/Container";
+import BlogSubscribeButton from "./BlogSubscribeButton";
 import { fetchPublishedBlogPosts, sortBlogPosts } from "../lib/blogStore";
 import { toPlainBlogText } from "../lib/blogContent";
 
@@ -135,8 +136,13 @@ export default function BlogPost() {
                       >
                         <div className={`pointer-events-none absolute -bottom-12 -left-10 h-40 w-40 rotate-[20deg] rounded-full ${style.shape}`} />
                         <div className={`pointer-events-none absolute -right-8 top-8 h-28 w-28 rotate-[30deg] rounded-full ${style.deco}`} />
+                        {post.isFeatured ? (
+                          <span className="relative z-10 inline-flex w-fit rounded-full border border-black/20 bg-white/65 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#101010] backdrop-blur">
+                            Featured
+                          </span>
+                        ) : null}
 
-                        <h3 className="relative z-10 max-w-[14ch] text-[34px] font-black uppercase leading-[0.95] tracking-tight sm:text-[42px]">
+                        <h3 className="relative z-10 mt-4 max-w-[14ch] text-[34px] font-black uppercase leading-[0.95] tracking-tight sm:text-[42px]">
                           {post.title}
                         </h3>
 
@@ -168,13 +174,18 @@ export default function BlogPost() {
                 <p className="mt-8 text-center text-sm text-black/70">No blog posts available yet.</p>
               )}
 
-              <div className="mt-10 flex justify-center">
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
                 <Link
                   to="/blog"
                   className="inline-flex h-11 items-center justify-center rounded-full bg-[#0e1220] px-7 text-[11px] font-semibold uppercase tracking-[0.12em] text-white transition-colors duration-200 hover:bg-white hover:text-[#0f1320]"
                 >
                   View All Blog Posts
                 </Link>
+                <BlogSubscribeButton
+                  buttonLabel="Subscribe"
+                  helperClassName="basis-full mt-1"
+                  helperText="Subscribe for blog updates and receive a confirmation email immediately."
+                />
               </div>
             </>
           ) : null}

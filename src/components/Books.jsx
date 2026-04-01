@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Container from "./ui/Container";
+import MotionReveal from "./ui/MotionReveal";
 import { books, booksFallbackImage } from "../data/books";
 
 function detectAfricaTimezone() {
@@ -13,12 +14,7 @@ function detectAfricaTimezone() {
 
 export default function Books() {
   const [activeBook, setActiveBook] = useState(null);
-  const [isAfricaUser, setIsAfricaUser] = useState(() => detectAfricaTimezone());
-
-  useEffect(() => {
-    // Keep regional behavior without triggering location permission prompts.
-    setIsAfricaUser(detectAfricaTimezone());
-  }, []);
+  const isAfricaUser = useMemo(() => detectAfricaTimezone(), []);
 
   const modalDetails = useMemo(() => {
     if (!activeBook) return null;
@@ -52,16 +48,18 @@ export default function Books() {
         }
       `}</style>
       <Container className="py-20 md:py-24">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7d6642]">
-          Book Collection
-        </p>
-        <h2 className="mt-3 text-[36px] font-black uppercase tracking-tight md:text-[42px]">
-          Books
-        </h2>
-        <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[#4e4336] md:text-base">
-          <span className="font-bold">Note:</span> Prices differ from the Amazon listing as these are direct author sales without the retail markup. 
-          Buying directly also helps support future book projects and keeps prices affordable for readers worldwide.
-        </p>
+        <MotionReveal delay={40} distance={28}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7d6642]">
+            Book Collection
+          </p>
+          <h2 className="mt-3 text-[36px] font-black uppercase tracking-tight md:text-[42px]">
+            Books
+          </h2>
+          <p className="mt-4 max-w-3xl text-sm leading-relaxed text-[#4e4336] md:text-base">
+            <span className="font-bold">Note:</span> Prices differ from the Amazon listing as these are direct author sales without the retail markup. 
+            Buying directly also helps support future book projects and keeps prices affordable for readers worldwide.
+          </p>
+        </MotionReveal>
 
         <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {books.map((pkg, idx) => {
@@ -80,8 +78,11 @@ export default function Books() {
             ];
 
             return (
-              <article
+              <MotionReveal
                 key={pkg.title + idx}
+                as="article"
+                delay={80 + idx * 80}
+                distance={30}
                 className={`group relative mx-auto flex w-full max-w-[340px] flex-col overflow-hidden rounded-[26px] border bg-gradient-to-b from-[#fbf8f2] to-[#efe4cf] transition-all duration-500 hover:-translate-y-1.5 ${
                   isFeatured
                     ? "border-[#aa8852]/80 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.42)]"
@@ -150,7 +151,7 @@ export default function Books() {
                     </span>
                   )}
                 </div>
-              </article>
+              </MotionReveal>
             );
           })}
         </div>
