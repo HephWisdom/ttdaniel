@@ -26,7 +26,7 @@ export const bibleStudies = [
   },
   {
     key: "bible-studies",
-    title: "BIBLE STUDIES",
+    title: "PROPHETIC TEACHINGS",
     groups: "18 groups subscribed",
     image: feb26,
     summary:

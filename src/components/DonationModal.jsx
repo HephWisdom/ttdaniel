@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import previewImage from "../assets/donate-img.png";
+import Container from "./ui/Container";
 import {
   createDonationCheckoutSession,
   DONATION_AMOUNTS,
@@ -16,11 +17,75 @@ const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || ""
 let stripeClientPromise = null;
 
 const frequencyOptions = [
-  { value: "one_time", label: "One-time", cadence: "One-time donation" },
-  { value: "week", label: "Weekly", cadence: "Weekly recurring donation" },
-  { value: "month", label: "Monthly", cadence: "Monthly recurring donation" },
-  { value: "year", label: "Yearly", cadence: "Yearly recurring donation" },
+  { value: "one_time", label: "One-time", cadence: "Single gift" },
+  { value: "month", label: "Monthly", cadence: "Recurring monthly support" },
+  { value: "week", label: "Weekly", cadence: "Recurring weekly support" },
+  { value: "year", label: "Yearly", cadence: "Recurring yearly support" },
 ];
+
+function HeartIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
+      <path d="M12 20.3 4.9 13.4a4.8 4.8 0 0 1 6.8-6.8l.3.3.3-.3a4.8 4.8 0 0 1 6.8 6.8L12 20.3Z" />
+    </svg>
+  );
+}
+
+function LockIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+      <path
+        d="M8 10V7.8A4 4 0 0 1 12 4a4 4 0 0 1 4 3.8V10"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <rect
+        x="6"
+        y="10"
+        width="12"
+        height="10"
+        rx="2.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M12 14.2v1.9"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function ChevronDownIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+      <path
+        d="m7 10 5 5 5-5"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function CloseIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="none">
+      <path
+        d="M6 6l12 12M18 6 6 18"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
 
 function formatFrequencyLabel(value) {
   return frequencyOptions.find((option) => option.value === value)?.label || "One-time";
@@ -58,17 +123,19 @@ async function getStripeClient() {
   return stripeClientPromise;
 }
 
-export default function DonationModal({ isOpen, onClose }) {
+export default function DonationPage() {
   const location = useLocation();
   const checkoutContainerRef = useRef(null);
   const embeddedCheckoutRef = useRef(null);
   const [frequency, setFrequency] = useState("one_time");
   const [selectedAmount, setSelectedAmount] = useState(20);
   const [customAmount, setCustomAmount] = useState("");
-  const [modalStep, setModalStep] = useState("selection");
+  const [viewStep, setViewStep] = useState("selection");
   const [isPreparingCheckout, setIsPreparingCheckout] = useState(false);
   const [donationError, setDonationError] = useState("");
   const [statusToast, setStatusToast] = useState(null);
+
+  const presetAmounts = useMemo(() => [...DONATION_AMOUNTS].sort((a, b) => b - a), []);
 
   const resolvedAmount = useMemo(() => {
     if (selectedAmount === "custom") {
@@ -77,6 +144,12 @@ export default function DonationModal({ isOpen, onClose }) {
     return normalizeDonationAmount(selectedAmount);
   }, [customAmount, selectedAmount]);
 
+  const displayAmountInput = selectedAmount === "custom"
+    ? customAmount
+    : resolvedAmount
+      ? String(resolvedAmount)
+      : "";
+
   const destroyEmbeddedCheckout = useCallback(() => {
     if (embeddedCheckoutRef.current) {
       embeddedCheckoutRef.current.destroy();
@@ -84,34 +157,15 @@ export default function DonationModal({ isOpen, onClose }) {
     }
   }, []);
 
-  const resetModalState = useCallback(() => {
+  const resetCheckoutState = useCallback(() => {
     destroyEmbeddedCheckout();
-    setModalStep("selection");
+    setViewStep("selection");
     setDonationError("");
     setIsPreparingCheckout(false);
   }, [destroyEmbeddedCheckout]);
 
   useEffect(() => {
-    if (!isOpen) return undefined;
-
-    const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        resetModalState();
-        onClose();
-      }
-    };
-
-    document.body.style.overflow = "hidden";
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.body.style.overflow = "";
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isOpen, onClose, resetModalState]);
-
-  useEffect(() => {
-    if (!isOpen || modalStep !== "checkout" || !embeddedCheckoutRef.current || !checkoutContainerRef.current) {
+    if (viewStep !== "checkout" || !embeddedCheckoutRef.current || !checkoutContainerRef.current) {
       return undefined;
     }
 
@@ -120,7 +174,26 @@ export default function DonationModal({ isOpen, onClose }) {
     return () => {
       embeddedCheckoutRef.current?.unmount();
     };
-  }, [isOpen, modalStep]);
+  }, [viewStep]);
+
+  useEffect(() => {
+    if (viewStep !== "checkout") return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        resetCheckoutState();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [resetCheckoutState, viewStep]);
 
   useEffect(() => {
     return () => {
@@ -137,6 +210,57 @@ export default function DonationModal({ isOpen, onClose }) {
 
     return () => window.clearTimeout(timeoutId);
   }, [statusToast]);
+
+  const handleDonationComplete = useCallback(
+    async (sessionId) => {
+      destroyEmbeddedCheckout();
+      setDonationError("");
+      setViewStep("success");
+
+      if (!sessionId) {
+        setStatusToast({
+          tone: "success",
+          title: "Donation received",
+          message: "Your donation was received successfully. Thank you for supporting TT Daniel.",
+        });
+        return;
+      }
+
+      try {
+        const session = await fetchDonationSessionStatus(sessionId);
+        const amount = session.amountTotal > 0 ? session.amountTotal / 100 : 0;
+        const returnedFrequency = normalizeDonationFrequency(
+          session.mode === "subscription" ? session.frequency : "one_time"
+        );
+
+        setFrequency(returnedFrequency);
+
+        setStatusToast({
+          tone: "success",
+          title: "Donation received",
+          message: amount
+            ? `${formatUsdAmount(amount)} donation received successfully. ${
+                session.emailSent
+                  ? "A thank-you email has been sent to your inbox."
+                  : "Thank you for supporting TT Daniel."
+              }`
+            : session.emailSent
+              ? "Your donation was received successfully. A thank-you email has been sent to your inbox."
+              : "Your donation was received successfully. Thank you for supporting TT Daniel.",
+        });
+      } catch (error) {
+        setStatusToast({
+          tone: "warning",
+          title: "Donation received",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Your payment was received, but we could not confirm the thank-you email yet.",
+        });
+      }
+    },
+    [destroyEmbeddedCheckout]
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -155,13 +279,30 @@ export default function DonationModal({ isOpen, onClose }) {
         if (isCancelled) return;
 
         const amount = session.amountTotal > 0 ? session.amountTotal / 100 : 0;
-        const frequencyLabel = formatFrequencyLabel(
+        const returnedFrequency = normalizeDonationFrequency(
           session.mode === "subscription" ? session.frequency : "one_time"
         );
+        const frequencyLabel = formatFrequencyLabel(returnedFrequency);
         const isComplete =
           session.status === "complete" ||
           session.paymentStatus === "paid" ||
           session.paymentStatus === "no_payment_required";
+
+        setFrequency(returnedFrequency);
+
+        if (amount > 0) {
+          if (DONATION_AMOUNTS.includes(amount)) {
+            setSelectedAmount(amount);
+            setCustomAmount("");
+          } else {
+            setSelectedAmount("custom");
+            setCustomAmount(String(amount));
+          }
+        }
+
+        if (isComplete) {
+          setViewStep("success");
+        }
 
         setStatusToast(
           isComplete
@@ -169,8 +310,14 @@ export default function DonationModal({ isOpen, onClose }) {
                 tone: "success",
                 title: "Donation received",
                 message: amount
-                  ? `${formatUsdAmount(amount)} donation received successfully. Thank you for supporting TT Daniel.`
-                  : "Your donation was received successfully. Thank you for supporting TT Daniel.",
+                  ? `${formatUsdAmount(amount)} donation received successfully. ${
+                      session.emailSent
+                        ? "A thank-you email has been sent to your inbox."
+                        : "Thank you for supporting TT Daniel."
+                    }`
+                  : session.emailSent
+                    ? "Your donation was received successfully. A thank-you email has been sent to your inbox."
+                    : "Your donation was received successfully. Thank you for supporting TT Daniel.",
               }
             : {
                 tone: "info",
@@ -205,11 +352,6 @@ export default function DonationModal({ isOpen, onClose }) {
     };
   }, [location.pathname, location.search]);
 
-  const handleClose = () => {
-    resetModalState();
-    onClose();
-  };
-
   const handleStartCheckout = async () => {
     setDonationError("");
 
@@ -223,7 +365,7 @@ export default function DonationModal({ isOpen, onClose }) {
 
     if (!STRIPE_PUBLISHABLE_KEY) {
       setDonationError(
-        "Set VITE_STRIPE_PUBLISHABLE_KEY on the site and STRIPE_SECRET_KEY in the Supabase function secrets to enable secure embedded donations."
+        "Donation payments are not configured yet. Please try again later."
       );
       return;
     }
@@ -234,11 +376,12 @@ export default function DonationModal({ isOpen, onClose }) {
     try {
       const stripe = await getStripeClient();
       if (!stripe) {
-        throw new Error("Stripe failed to load in the browser.");
+        throw new Error("Secure donation form failed to load.");
       }
 
       const pagePath = buildCurrentPagePath(location);
       const nextFrequency = normalizeDonationFrequency(frequency);
+      let checkoutSessionId = "";
 
       embeddedCheckoutRef.current = await stripe.initEmbeddedCheckout({
         fetchClientSecret: async () => {
@@ -247,18 +390,18 @@ export default function DonationModal({ isOpen, onClose }) {
             frequency: nextFrequency,
             pagePath,
           });
+          checkoutSessionId = session.sessionId;
           return session.clientSecret;
         },
         onComplete: () => {
-          destroyEmbeddedCheckout();
-          setModalStep("success");
+          handleDonationComplete(checkoutSessionId);
         },
       });
 
-      setModalStep("checkout");
+      setViewStep("checkout");
     } catch (error) {
       destroyEmbeddedCheckout();
-      setModalStep("selection");
+      setViewStep("selection");
       setDonationError(
         error instanceof Error ? error.message : "Unable to open the secure donation form."
       );
@@ -267,241 +410,293 @@ export default function DonationModal({ isOpen, onClose }) {
     }
   };
 
-  if (!isOpen && !statusToast) {
-    return null;
-  }
-
-  const donationUi = (
+  return (
     <>
-      {isOpen ? (
-        <div
-          className="fixed inset-0 z-[140] overflow-y-auto bg-black/70 p-3 backdrop-blur-[2px] sm:p-4 md:p-6"
-          onClick={handleClose}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Donate to TT Daniel"
-        >
-          <div className="flex min-h-full items-start justify-center">
-            <div
-              className="relative my-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-[30px] border border-[#d7bf95]/25 bg-[linear-gradient(180deg,#14110d_0%,#0e0c09_100%)] text-[#f8edd4] shadow-[0_40px_110px_-40px_rgba(0,0,0,0.9)] max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2rem)] md:max-h-[calc(100vh-3rem)]"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="pointer-events-none absolute -left-16 top-0 h-48 w-48 rounded-full bg-[#f0c372]/15 blur-3xl" />
-              <div className="pointer-events-none absolute -right-20 bottom-0 h-56 w-56 rounded-full bg-[#7c5e30]/18 blur-3xl" />
-
-              <div className="relative shrink-0 flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6 sm:py-5">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#d7b780]">
-                    Give
-                  </p>
-                  <h2 className="mt-2 text-2xl font-black uppercase tracking-tight text-[#fff4de] sm:text-3xl">
-                    Support The Ministry
-                  </h2>
-                  <p className="mt-3 max-w-[44ch] text-sm leading-relaxed text-[#dbc7a4]">
-                    Choose a one-time or recurring donation and complete the payment securely inside
-                    the site through Stripe.
-                  </p>
+      <main className="bg-[#f7f5f1] py-6 sm:py-8 md:py-10">
+        <Container className="max-w-[1380px] px-4 sm:px-6 lg:px-8">
+          {viewStep === "success" ? (
+            <section className="mx-auto max-w-3xl rounded-[32px] border border-[#e3ddd6] bg-white px-5 py-8 text-center shadow-[0_28px_70px_-36px_rgba(0,0,0,0.18)] sm:px-8 sm:py-10">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8c7962]">
+                Thank you
+              </p>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[#201b17] sm:text-4xl">
+                Your gift has been received
+              </h1>
+              <p className="mx-auto mt-4 max-w-[34rem] text-sm leading-relaxed text-[#62584d] sm:text-base">
+                Your {formatFrequencyLabel(frequency).toLowerCase()} support helps TT Daniel&apos;s
+                ministry continue its teaching, outreach, and care efforts.
+              </p>
+              <div className="mx-auto mt-8 max-w-xl rounded-[24px] border border-[#ece5db] bg-[#faf8f4] px-5 py-5 text-left">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8c7962]">
+                  Donation summary
+                </p>
+                <div className="mt-4 flex items-center justify-between gap-4 text-sm text-[#62584d]">
+                  <span>Amount</span>
+                  <span className="font-semibold text-[#201b17]">
+                    {formatUsdAmount(resolvedAmount)}
+                  </span>
                 </div>
+                <div className="mt-3 flex items-center justify-between gap-4 text-sm text-[#62584d]">
+                  <span>Cadence</span>
+                  <span className="font-semibold text-[#201b17]">
+                    {formatFrequencyLabel(frequency)}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
                 <button
                   type="button"
-                  onClick={handleClose}
-                  className="inline-flex h-10 items-center justify-center rounded-full border border-white/15 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#f6ead2] transition hover:border-[#d7b780] hover:bg-[#f6ead2] hover:text-[#1d160f]"
+                  onClick={() => {
+                    setViewStep("selection");
+                    setDonationError("");
+                  }}
+                  className="inline-flex h-12 items-center justify-center rounded-[14px] bg-[#201b17] px-6 text-sm font-semibold text-white transition hover:bg-[#342b23]"
                 >
-                  Close
+                  Give again
                 </button>
+                <Link
+                  to="/"
+                  className="inline-flex h-12 items-center justify-center rounded-[14px] border border-[#d8d1c8] px-6 text-sm font-semibold text-[#201b17] transition hover:bg-[#f3efe9]"
+                >
+                  Back home
+                </Link>
+              </div>
+            </section>
+          ) : (
+            <section className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-12">
+              <div className="pt-3 sm:pt-6 lg:pt-10">
+                <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#8a7a66]">
+                  TT Daniel Ministries
+                </p>
+                <h1 className="mt-4 whitespace-nowrap text-[clamp(1.75rem,6vw,3.45rem)] font-semibold tracking-tight text-[#1f1b17]">
+                  Support The Ministry
+                </h1>
+                <div className="mt-10 h-px w-24 bg-[#d9d1c7] sm:mt-14" />
+                <div className="mt-8 max-w-[58ch] space-y-8 text-base leading-[1.7] text-[#40372e] sm:mt-12 sm:text-[1.15rem]">
+                  <p>
+                    Every gift helps sustain TT Daniel&apos;s teaching, outreach, counseling, and
+                    ministry programs across the community and beyond.
+                  </p>
+                  <p>
+                    Use the support panel to choose a one-time or recurring gift, then complete the
+                    payment in the secure checkout popup.
+                  </p>
+                </div>
               </div>
 
-              {modalStep === "selection" ? (
-                <div className="relative min-h-0 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-                  <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-                    <div>
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        {frequencyOptions.map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setFrequency(option.value)}
-                            className={joinClasses(
-                              "rounded-[20px] border px-4 py-4 text-left transition",
-                              frequency === option.value
-                                ? "border-[#f0c372] bg-[#f0c372]/12 text-[#fff6e6]"
-                                : "border-white/10 bg-white/[0.03] text-[#e3d1af] hover:border-[#f0c372]/45 hover:bg-[#f0c372]/8"
-                            )}
-                          >
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em]">
-                              {option.label}
-                            </p>
-                            <p className="mt-2 text-sm text-current/75">{option.cadence}</p>
-                          </button>
-                        ))}
-                      </div>
+              <aside className="lg:sticky lg:top-24">
+                <div className="rounded-[28px] border border-[#e2dcd4] bg-white p-5 shadow-[0_28px_70px_-36px_rgba(0,0,0,0.18)] sm:p-6">
+                  <div className="grid grid-cols-2 gap-2">
+                    {frequencyOptions.map((option) => {
+                      const isActive = frequency === option.value;
+                      const isRecurring = option.value !== "one_time";
 
-                      <div className="mt-6">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d7b780]">
-                          Select amount
-                        </p>
-                        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                          {DONATION_AMOUNTS.map((amount) => (
-                            <button
-                              key={amount}
-                              type="button"
-                              onClick={() => {
-                                setSelectedAmount(amount);
-                                setCustomAmount("");
-                              }}
-                              className={joinClasses(
-                                "rounded-[18px] border px-4 py-4 text-center text-sm font-semibold transition",
-                                selectedAmount === amount
-                                  ? "border-[#f0c372] bg-[#fff3db] text-[#24180f]"
-                                  : "border-white/10 bg-white/[0.03] text-[#f8edd4] hover:border-[#f0c372]/45 hover:bg-[#f0c372]/8"
-                              )}
-                            >
-                              {formatUsdAmount(amount)}
-                            </button>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedAmount("custom")}
-                            className={joinClasses(
-                              "rounded-[18px] border px-4 py-4 text-center text-sm font-semibold transition",
-                              selectedAmount === "custom"
-                                ? "border-[#f0c372] bg-[#fff3db] text-[#24180f]"
-                                : "border-white/10 bg-white/[0.03] text-[#f8edd4] hover:border-[#f0c372]/45 hover:bg-[#f0c372]/8"
-                            )}
-                          >
-                            Custom
-                          </button>
-                        </div>
-                      </div>
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setFrequency(option.value)}
+                          className={joinClasses(
+                            "inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[12px] border px-4 py-3 text-sm font-semibold transition",
+                            isActive
+                              ? "border-[#26221e] bg-[#faf7f3] text-[#1f1b17]"
+                              : "border-[#d9d2ca] bg-white text-[#2f2923] hover:border-[#bdb4aa]"
+                          )}
+                        >
+                          {isRecurring ? <HeartIcon className="h-4 w-4" /> : null}
+                          <span>{option.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                      {selectedAmount === "custom" ? (
-                        <div className="mt-4 max-w-xs">
-                          <label className="block">
-                            <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[#d7b780]">
-                              Custom amount
-                            </span>
-                            <div className="flex h-12 items-center rounded-2xl border border-white/12 bg-black/20 px-4">
-                              <span className="mr-3 text-sm font-semibold text-[#d7b780]">$</span>
-                              <input
-                                type="number"
-                                min={DONATION_MIN_AMOUNT}
-                                max={DONATION_MAX_AMOUNT}
-                                step="1"
-                                value={customAmount}
-                                onChange={(event) => setCustomAmount(event.target.value)}
-                                className="w-full bg-transparent text-sm text-[#fff4de] outline-none"
-                                placeholder="Enter amount"
-                                inputMode="numeric"
-                              />
-                            </div>
-                          </label>
-                        </div>
-                      ) : null}
+                  <p className="mt-7 text-center text-[1.05rem] font-medium text-[#24201b]">
+                    Choose your gift
+                  </p>
 
-                      {donationError ? (
-                        <div className="mt-4 rounded-2xl border border-[#d08d73]/25 bg-[#3b221d] px-4 py-3 text-sm text-[#ffd4c9]">
-                          {donationError}
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d7b780]">
-                        Donation summary
-                      </p>
-                      <div className="mt-4 rounded-[20px] border border-[#f0c372]/20 bg-black/20 p-4">
-                        <p className="text-sm text-[#d9c7a4]">Amount</p>
-                        <p className="mt-2 text-3xl font-black text-[#fff6e6]">
-                          {resolvedAmount ? formatUsdAmount(resolvedAmount) : "$0"}
-                        </p>
-                        <p className="mt-3 text-sm text-[#d9c7a4]">
-                          {formatFrequencyLabel(frequency)}
-                        </p>
-                      </div>
-                      <ul className="mt-5 space-y-3 text-sm leading-relaxed text-[#d9c7a4]">
-                        <li>Card details stay inside Stripe-hosted iframes and never hit your server.</li>
-                        <li>Donation amount and billing cadence are validated again on the server.</li>
-                        <li>Preset amounts and custom donations stay inside the $5 to $5000 range.</li>
-                      </ul>
+                  <div className="mt-5 grid grid-cols-3 gap-2">
+                    {presetAmounts.map((amount) => (
                       <button
+                        key={amount}
                         type="button"
-                        onClick={handleStartCheckout}
-                        disabled={isPreparingCheckout}
-                        className="mt-6 inline-flex h-12 w-full items-center justify-center rounded-full bg-[#f0c372] px-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#23170d] transition hover:bg-[#fff1d1] disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => {
+                          setSelectedAmount(amount);
+                          setCustomAmount("");
+                        }}
+                        className={joinClasses(
+                          "rounded-[12px] border px-3 py-3 text-center text-[1rem] font-medium transition",
+                          selectedAmount === amount
+                            ? "border-[#26221e] bg-[#faf7f3] text-[#1f1b17]"
+                            : "border-[#d9d2ca] bg-white text-[#2f2923] hover:border-[#bdb4aa]"
+                        )}
                       >
-                        {isPreparingCheckout
-                          ? "Preparing secure checkout..."
-                          : "Continue to secure checkout"}
+                        {formatUsdAmount(amount)}
                       </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAmount("custom")}
+                      className={joinClasses(
+                        "rounded-[12px] border px-3 py-3 text-center text-[1rem] font-medium transition",
+                        selectedAmount === "custom"
+                          ? "border-[#26221e] bg-[#faf7f3] text-[#1f1b17]"
+                          : "border-[#d9d2ca] bg-white text-[#2f2923] hover:border-[#bdb4aa]"
+                      )}
+                    >
+                      Other
+                    </button>
+                  </div>
+
+                  {selectedAmount === "custom" ? (
+                    <label className="mt-4 block">
+                      <span className="sr-only">Donation amount</span>
+                      <div className="flex items-center justify-between gap-3 rounded-[14px] border border-[#d7d0c9] bg-white px-4 py-3">
+                        <div className="flex min-w-0 flex-1 items-baseline gap-2">
+                          <span className="text-[1.45rem] font-medium text-[#201b17]">$</span>
+                          <input
+                            type="number"
+                            min={DONATION_MIN_AMOUNT}
+                            max={DONATION_MAX_AMOUNT}
+                            step="1"
+                            value={displayAmountInput}
+                            onChange={(event) => {
+                              setSelectedAmount("custom");
+                              setCustomAmount(event.target.value);
+                            }}
+                            className="min-w-0 flex-1 bg-transparent text-[2rem] font-medium tracking-tight text-[#201b17] outline-none placeholder:text-[#a89f95]"
+                            placeholder="0"
+                            inputMode="numeric"
+                          />
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-sm font-medium text-[#6f665b]">
+                          USD
+                          <ChevronDownIcon className="h-4 w-4" />
+                        </span>
+                      </div>
+                    </label>
+                  ) : null}
+
+                  {donationError ? (
+                    <div className="mt-4 rounded-[14px] border border-[#edcabd] bg-[#fff5f1] px-4 py-3 text-sm text-[#8b3c26]">
+                      {donationError}
+                    </div>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleStartCheckout}
+                    disabled={isPreparingCheckout}
+                    className="mt-5 inline-flex h-14 w-full items-center justify-center rounded-[14px] bg-[#23201d] px-6 text-base font-semibold text-white transition hover:bg-[#34302c] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isPreparingCheckout ? "Opening secure form..." : "Support"}
+                  </button>
+                </div>
+              </aside>
+            </section>
+          )}
+
+        </Container>
+      </main>
+
+      {viewStep === "checkout" ? (
+        <div
+          className="fixed inset-0 z-[140] overflow-y-auto bg-black/50 p-3 backdrop-blur-[2px] sm:p-6"
+          onClick={resetCheckoutState}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Secure donation"
+        >
+          <div className="flex min-h-full items-center justify-center">
+            <div
+              className="relative grid w-full max-w-5xl overflow-hidden rounded-[32px] bg-white shadow-[0_36px_110px_-40px_rgba(0,0,0,0.55)] lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,420px)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={resetCheckoutState}
+                className="absolute right-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-[#3b342d] shadow-[0_14px_30px_-18px_rgba(0,0,0,0.35)] transition hover:bg-white"
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+
+              <div className="hidden bg-[#f4f1ec] lg:flex lg:min-h-[720px] lg:flex-col">
+                <img src={previewImage} alt="" className="h-[300px] w-full object-cover" />
+                <div className="flex flex-1 flex-col px-8 py-8">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#ddd5cb] bg-white text-[#221d18]">
+                    <HeartIcon className="h-4 w-4" />
+                  </div>
+                  <h2 className="mt-6 text-[2rem] font-semibold tracking-tight text-[#201b17]">
+                    Support in progress
+                  </h2>
+                  <p className="mt-4 text-[15px] leading-relaxed text-[#5e564d]">
+                    You&apos;re completing a secure gift. The amount and cadence you selected on the
+                    donate page are shown here for confirmation before payment.
+                  </p>
+
+                  <div className="mt-auto rounded-[24px] border border-[#e4ddd4] bg-white p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8c7962]">
+                      Selected gift
+                    </p>
+                    <div className="mt-4 flex items-center justify-between gap-4 text-sm text-[#655b51]">
+                      <span>Amount</span>
+                      <span className="font-semibold text-[#201b17]">
+                        {formatUsdAmount(resolvedAmount)}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-4 text-sm text-[#655b51]">
+                      <span>Cadence</span>
+                      <span className="font-semibold text-[#201b17]">
+                        {formatFrequencyLabel(frequency)}
+                      </span>
                     </div>
                   </div>
                 </div>
-              ) : modalStep === "checkout" ? (
-                <div className="relative min-h-0 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6">
-                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              </div>
+
+              <div className="flex min-h-[640px] min-w-0 flex-col bg-white">
+                <div className="lg:hidden">
+                  <img src={previewImage} alt="" className="h-44 w-full object-cover" />
+                </div>
+
+                <div className="border-b border-[#ece6de] px-5 py-5 sm:px-6">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#eff8f1] text-[#08a36a]">
+                      <LockIcon className="h-5 w-5" />
+                    </span>
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#d7b780]">
-                        Secure checkout
+                      <p className="text-[1.05rem] font-semibold text-[#201b17]">
+                        Secure donation
                       </p>
-                      <p className="mt-2 text-sm text-[#dbc7a4]">
-                        {formatUsdAmount(resolvedAmount)} · {formatFrequencyLabel(frequency)}
+                      <p className="text-sm text-[#6a6157]">
+                        Review your gift and complete payment.
                       </p>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        resetModalState();
-                      }}
-                      className="inline-flex h-10 items-center justify-center rounded-full border border-white/12 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#f6ead2] transition hover:border-[#d7b780] hover:bg-[#f6ead2] hover:text-[#1d160f]"
-                    >
-                      Back
-                    </button>
                   </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <div className="rounded-[14px] border border-[#d8d1c8] px-4 py-3 text-sm font-semibold text-[#201b17]">
+                      {formatFrequencyLabel(frequency)}
+                    </div>
+                    <div className="rounded-[14px] border border-[#d8d1c8] px-4 py-3 text-sm font-semibold text-[#201b17]">
+                      {formatUsdAmount(resolvedAmount)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
                   <div
                     ref={checkoutContainerRef}
-                    className="min-h-[420px] overflow-hidden rounded-[24px] border border-white/10 bg-white sm:min-h-[520px] md:min-h-[560px]"
+                    className="min-h-[520px] overflow-hidden rounded-[22px] border border-[#ebe5dc] bg-white"
                   />
                 </div>
-              ) : (
-                <div className="relative min-h-0 overflow-y-auto px-5 py-8 text-center sm:px-6 sm:py-10">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#d7b780]">
-                    Thank you
-                  </p>
-                  <h3 className="mt-3 text-3xl font-black uppercase tracking-tight text-[#fff6e6]">
-                    Donation received
-                  </h3>
-                  <p className="mx-auto mt-4 max-w-[34rem] text-sm leading-relaxed text-[#dbc7a4]">
-                    Your {formatFrequencyLabel(frequency).toLowerCase()} support helps TT Daniel’s
-                    ministry continue its outreach, teaching, and revival work.
-                  </p>
-                  <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={handleClose}
-                      className="inline-flex h-11 items-center justify-center rounded-full bg-[#f0c372] px-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#23170d] transition hover:bg-[#fff1d1]"
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModalStep("selection");
-                        setDonationError("");
-                      }}
-                      className="inline-flex h-11 items-center justify-center rounded-full border border-white/12 px-6 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#f6ead2] transition hover:border-[#d7b780] hover:bg-[#f6ead2] hover:text-[#1d160f]"
-                    >
-                      Give again
-                    </button>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
       ) : null}
 
       {statusToast ? (
-        <div className="pointer-events-none fixed bottom-5 right-5 z-[150] w-full max-w-sm px-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-3 z-[150] px-3 sm:bottom-5 sm:right-5 sm:left-auto sm:w-full sm:max-w-sm sm:px-4">
           <div
             className={`pointer-events-auto rounded-[24px] border px-5 py-4 shadow-[0_28px_70px_-34px_rgba(0,0,0,0.55)] ${
               statusToast.tone === "warning"
@@ -531,10 +726,4 @@ export default function DonationModal({ isOpen, onClose }) {
       ) : null}
     </>
   );
-
-  if (typeof document === "undefined") {
-    return donationUi;
-  }
-
-  return createPortal(donationUi, document.body);
 }

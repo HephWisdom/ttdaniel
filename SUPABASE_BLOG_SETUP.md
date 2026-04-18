@@ -166,7 +166,18 @@ create policy "Authenticated delete blog images"
 5. Open public pages (`/#blog`, `/blog`, `/blog/:id`) and confirm read access still works when signed out.
 6. Add a comment on a post while signed out.
 
-## 7) Blog subscribers
+## 7) Shared admin drafts
+Run the migration in [supabase/migrations/20260402_blog_drafts.sql](/home/wisdom/Desktop/ttdanielportfolio/supabase/migrations/20260402_blog_drafts.sql).
+
+This creates `public.blog_drafts`, scoped by authenticated admin user id, so the draft editor state is shared across browsers/devices for the same signed-in admin account.
+
+Notes:
+- Drafts are private to the authenticated owner via RLS.
+- The current implementation keeps one shared draft per admin account and updates it on each `Save Draft`.
+- Any existing browser-local admin draft is auto-migrated to Supabase the first time the create editor opens after deployment and the admin is signed in.
+- If Supabase is not configured, the app falls back to browser-local draft storage for development.
+
+## 8) Blog subscribers
 Run the migration in [supabase/migrations/20260325_blog_subscribers.sql](/home/wisdom/Desktop/ttdanielportfolio/supabase/migrations/20260325_blog_subscribers.sql).
 
 If you prefer to paste SQL manually, run this in Supabase SQL Editor:
@@ -211,7 +222,7 @@ Notes:
 - No public `select` policy is added for `blog_subscribers`, so the subscriber list stays private.
 - The website stores emails in lowercase and rejects duplicates with the table unique constraint.
 
-## 8) Subscriber email functions
+## 9) Subscriber email functions
 This repo now includes:
 - [supabase/functions/subscribe-to-blog/index.ts](/home/wisdom/Desktop/ttdanielportfolio/supabase/functions/subscribe-to-blog/index.ts) for public signup + confirmation email.
 - [supabase/functions/broadcast-blog-post/index.ts](/home/wisdom/Desktop/ttdanielportfolio/supabase/functions/broadcast-blog-post/index.ts) for admin publish broadcasts.

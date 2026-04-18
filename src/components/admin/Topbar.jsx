@@ -10,7 +10,11 @@ import useAdminBlog from "./useAdminBlog";
 const tabs = [
   { label: "Overview", path: "/admin/blog" },
   { label: "Articles", path: "/admin/blog/create" },
+  { label: "Drafts", path: "/admin/blog/drafts" },
   { label: "Analytics", path: "/admin/blog/analytics" },
+  { label: "Subscribers", path: "/admin/blog/subscribers" },
+  { label: "E-books", path: "/admin/blog/ebooks" },
+  { label: "Donations", path: "/admin/blog/donations" },
 ];
 
 function isTabActive(tabPath, location) {

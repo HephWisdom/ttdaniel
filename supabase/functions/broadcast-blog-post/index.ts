@@ -1,11 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
 function normalizeEnvValue(value: string | undefined) {
   const trimmed = String(value || "").trim();
   if (
@@ -15,6 +9,30 @@ function normalizeEnvValue(value: string | undefined) {
     return trimmed.slice(1, -1).trim();
   }
   return trimmed;
+}
+
+function normalizeOrigin(siteUrl: string) {
+  try {
+    return new URL(siteUrl).origin;
+  } catch {
+    return "";
+  }
+}
+
+function buildCorsHeaders(siteUrl: string, request: Request) {
+  const siteOrigin = normalizeOrigin(siteUrl);
+  const requestOrigin = normalizeEnvValue(request.headers.get("Origin") || undefined);
+  const allowOrigin =
+    requestOrigin && (requestOrigin === siteOrigin || requestOrigin.startsWith("http://localhost:"))
+      ? requestOrigin
+      : siteOrigin || "*";
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
 }
 
 type BlogPost = {
@@ -33,14 +51,61 @@ type BlogSubscriber = {
   email: string;
 };
 
-function jsonResponse(status: number, body: Record<string, unknown>) {
+function jsonResponse(
+  status: number,
+  body: Record<string, unknown>,
+  siteUrl: string,
+  request: Request
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...buildCorsHeaders(siteUrl, request),
+      "Cache-Control": "no-store",
       "Content-Type": "application/json",
     },
   });
+}
+
+async function ensureAuthorizedBlogAdmin({
+  adminClient,
+  callerEmail,
+  allowedAdminEmail,
+}: {
+  adminClient: ReturnType<typeof createClient>;
+  callerEmail: string;
+  allowedAdminEmail: string;
+}) {
+  if (allowedAdminEmail) {
+    return callerEmail === allowedAdminEmail
+      ? null
+      : { status: 403, error: "This account is not allowed to send subscriber emails." };
+  }
+
+  const { data, error } = await adminClient
+    .from("blog_admins")
+    .select("email")
+    .eq("email", callerEmail)
+    .maybeSingle();
+
+  if (error) {
+    const message = String(error.message || "");
+    return {
+      status: 500,
+      error: message.toLowerCase().includes("blog_admins")
+        ? "Add the blog_admins table in Supabase before using subscriber email tools."
+        : message || "Unable to verify admin access.",
+    };
+  }
+
+  if (!data?.email) {
+    return {
+      status: 403,
+      error: "This account is not allowed to send subscriber emails.",
+    };
+  }
+
+  return null;
 }
 
 function escapeHtml(value = "") {
@@ -184,12 +249,14 @@ async function sendResendEmail({
 }
 
 Deno.serve(async (request) => {
+  const siteUrl = normalizeEnvValue(Deno.env.get("SITE_URL"));
+
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: buildCorsHeaders(siteUrl, request) });
   }
 
   if (request.method !== "POST") {
-    return jsonResponse(405, { error: "Method not allowed." });
+    return jsonResponse(405, { error: "Method not allowed." }, siteUrl, request);
   }
 
   const supabaseUrl = normalizeEnvValue(Deno.env.get("SUPABASE_URL"));
@@ -197,24 +264,23 @@ Deno.serve(async (request) => {
   const serviceRoleKey = normalizeEnvValue(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
   const resendApiKey = normalizeEnvValue(Deno.env.get("RESEND_API_KEY"));
   const senderEmail = normalizeEnvValue(Deno.env.get("BLOG_EMAIL_FROM"));
-  const siteUrl = normalizeEnvValue(Deno.env.get("SITE_URL"));
   const allowedAdminEmail = normalizeEnvValue(Deno.env.get("BLOG_ADMIN_EMAIL")).toLowerCase();
 
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
     return jsonResponse(500, {
       error: "Supabase function secrets are incomplete.",
-    });
+    }, siteUrl, request);
   }
 
   if (!resendApiKey || !senderEmail || !siteUrl) {
     return jsonResponse(500, {
       error: "Set RESEND_API_KEY, BLOG_EMAIL_FROM, and SITE_URL before sending blog emails.",
-    });
+    }, siteUrl, request);
   }
 
   const authHeader = request.headers.get("Authorization");
   if (!authHeader) {
-    return jsonResponse(401, { error: "Missing authorization header." });
+    return jsonResponse(401, { error: "Missing authorization header." }, siteUrl, request);
   }
 
   const authClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -235,28 +301,23 @@ Deno.serve(async (request) => {
   } = await authClient.auth.getUser();
 
   if (userError || !user) {
-    return jsonResponse(401, { error: "Admin session required to email subscribers." });
+    return jsonResponse(401, { error: "Admin session required to email subscribers." }, siteUrl, request);
   }
 
   const callerEmail = String(user.email || "").toLowerCase();
-  if (allowedAdminEmail && callerEmail !== allowedAdminEmail) {
-    return jsonResponse(403, {
-      error: "This account is not allowed to send subscriber emails.",
-    });
-  }
 
   let body: { postId?: string; force?: boolean };
   try {
     body = await request.json();
   } catch {
-    return jsonResponse(400, { error: "Request body must be valid JSON." });
+    return jsonResponse(400, { error: "Request body must be valid JSON." }, siteUrl, request);
   }
 
   const postId = typeof body?.postId === "string" ? body.postId.trim() : "";
   const force = body?.force === true;
 
   if (!postId) {
-    return jsonResponse(400, { error: "Missing postId." });
+    return jsonResponse(400, { error: "Missing postId." }, siteUrl, request);
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -265,6 +326,21 @@ Deno.serve(async (request) => {
       autoRefreshToken: false,
     },
   });
+
+  const authorizationError = await ensureAuthorizedBlogAdmin({
+    adminClient,
+    callerEmail,
+    allowedAdminEmail,
+  });
+
+  if (authorizationError) {
+    return jsonResponse(
+      authorizationError.status,
+      { error: authorizationError.error },
+      siteUrl,
+      request
+    );
+  }
 
   const { data: postData, error: postError } = await adminClient
     .from("blog_posts")
@@ -277,25 +353,25 @@ Deno.serve(async (request) => {
     if (message.includes("subscriber_notified_at")) {
       return jsonResponse(500, {
         error: "Add blog_posts.subscriber_notified_at in Supabase before using subscriber email.",
-      });
+      }, siteUrl, request);
     }
-    return jsonResponse(500, { error: message || "Unable to load the blog post." });
+    return jsonResponse(500, { error: message || "Unable to load the blog post." }, siteUrl, request);
   }
 
   const post = postData as BlogPost | null;
   if (!post) {
-    return jsonResponse(404, { error: "Blog post not found." });
+    return jsonResponse(404, { error: "Blog post not found." }, siteUrl, request);
   }
 
   const publishDate = new Date(post.created_at);
   if (Number.isNaN(publishDate.getTime())) {
-    return jsonResponse(400, { error: "This post has an invalid publish date." });
+    return jsonResponse(400, { error: "This post has an invalid publish date." }, siteUrl, request);
   }
 
   if (!force && publishDate.getTime() > Date.now()) {
     return jsonResponse(409, {
       error: "This post is scheduled for the future. Publish it before emailing subscribers.",
-    });
+    }, siteUrl, request);
   }
 
   if (!force && post.subscriber_notified_at) {
@@ -304,7 +380,7 @@ Deno.serve(async (request) => {
       sentCount: 0,
       skipped: true,
       reason: "already_notified",
-    });
+    }, siteUrl, request);
   }
 
   const { data: subscriberData, error: subscriberError } = await adminClient
@@ -319,7 +395,7 @@ Deno.serve(async (request) => {
       error: message.includes("blog_subscribers")
         ? "Add the blog_subscribers table in Supabase before sending subscriber email."
         : message || "Unable to load subscribers.",
-    });
+    }, siteUrl, request);
   }
 
   const subscribers = Array.isArray(subscriberData)
@@ -334,7 +410,7 @@ Deno.serve(async (request) => {
       sentCount: 0,
       skipped: true,
       reason: "no_active_subscribers",
-    });
+    }, siteUrl, request);
   }
 
   const postUrl = buildPostUrl(siteUrl, post.id);
@@ -368,7 +444,7 @@ Deno.serve(async (request) => {
       sentCount,
       failedCount: failures.length,
       failures: failures.slice(0, 10),
-    });
+    }, siteUrl, request);
   }
 
   const { error: updateError } = await adminClient
@@ -383,12 +459,12 @@ Deno.serve(async (request) => {
       error: `Emails were sent, but subscriber_notified_at could not be saved: ${updateError.message}`,
       postId: post.id,
       sentCount,
-    });
+    }, siteUrl, request);
   }
 
   return jsonResponse(200, {
     postId: post.id,
     sentCount,
     skipped: false,
-  });
+  }, siteUrl, request);
 });

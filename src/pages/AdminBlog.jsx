@@ -5,10 +5,15 @@ import Sidebar from "../components/admin/Sidebar";
 import Topbar from "../components/admin/Topbar";
 import AnalyticsPage from "./admin/AnalyticsPage";
 import CreatePage from "./admin/CreatePage";
+import DonationsPage from "./admin/DonationsPage";
+import DraftsPage from "./admin/DraftsPage";
+import EbookPurchasesPage from "./admin/EbookPurchasesPage";
 import OverviewPage from "./admin/OverviewPage";
+import SubscribersPage from "./admin/SubscribersPage";
 import {
   getAdminSession,
   onAdminAuthStateChange,
+  requireAuthorizedAdmin,
   signInAdmin,
   signOutAdmin,
 } from "../lib/supabaseClient";
@@ -282,11 +287,23 @@ export default function AdminBlog() {
       try {
         const session = await getAdminSession();
         if (!isMounted) return;
-        setIsVerified(Boolean(session));
-        setAuthEmail(session?.user?.email || "");
-        setAdminDisplayName(resolveAdminDisplayName(session));
+        if (!session) {
+          setIsVerified(false);
+          setAuthEmail("");
+          setAdminDisplayName(ADMIN_USER_NAME);
+          return;
+        }
+
+        const authorizedSession = await requireAuthorizedAdmin(session);
+        if (!isMounted) return;
+        setIsVerified(Boolean(authorizedSession));
+        setAuthEmail(authorizedSession?.user?.email || "");
+        setAdminDisplayName(resolveAdminDisplayName(authorizedSession));
       } catch (error) {
         if (!isMounted) return;
+        await signOutAdmin().catch(() => {});
+        setIsVerified(false);
+        setAuthEmail("");
         setAuthError(error.message || "Unable to verify admin session.");
       } finally {
         if (isMounted) {
@@ -298,9 +315,25 @@ export default function AdminBlog() {
     checkSession();
 
     const { data } = onAdminAuthStateChange((session) => {
-      setIsVerified(Boolean(session));
-      setAuthEmail(session?.user?.email || "");
-      setAdminDisplayName(resolveAdminDisplayName(session));
+      if (!session) {
+        setIsVerified(false);
+        setAuthEmail("");
+        setAdminDisplayName(ADMIN_USER_NAME);
+        return;
+      }
+
+      requireAuthorizedAdmin(session)
+        .then((authorizedSession) => {
+          setIsVerified(Boolean(authorizedSession));
+          setAuthEmail(authorizedSession?.user?.email || "");
+          setAdminDisplayName(resolveAdminDisplayName(authorizedSession));
+        })
+        .catch(async (error) => {
+          await signOutAdmin().catch(() => {});
+          setIsVerified(false);
+          setAuthEmail("");
+          setAuthError(error.message || "Unable to verify admin session.");
+        });
     });
 
     return () => {
@@ -375,11 +408,14 @@ export default function AdminBlog() {
 
     try {
       const session = await signInAdmin(credentials.email, credentials.password);
-      setIsVerified(Boolean(session));
-      setAuthEmail(session?.user?.email || credentials.email.trim());
-      setAdminDisplayName(resolveAdminDisplayName(session, credentials.email.trim()));
+      const authorizedSession = await requireAuthorizedAdmin(session);
+      setIsVerified(Boolean(authorizedSession));
+      setAuthEmail(authorizedSession?.user?.email || credentials.email.trim());
+      setAdminDisplayName(resolveAdminDisplayName(authorizedSession, credentials.email.trim()));
       setCredentials({ email: "", password: "" });
     } catch (error) {
+      await signOutAdmin().catch(() => {});
+      setIsVerified(false);
       setAuthError(error.message || "Login failed.");
     } finally {
       setIsAuthSubmitting(false);
@@ -785,7 +821,11 @@ export default function AdminBlog() {
               <Routes>
                 <Route index element={<OverviewPage />} />
                 <Route path="create" element={<CreatePage />} />
+                <Route path="drafts" element={<DraftsPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
+                <Route path="subscribers" element={<SubscribersPage />} />
+                <Route path="ebooks" element={<EbookPurchasesPage />} />
+                <Route path="donations" element={<DonationsPage />} />
                 <Route path="*" element={<Navigate to="/admin/blog" replace />} />
               </Routes>
             </main>

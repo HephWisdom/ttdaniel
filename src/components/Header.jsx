@@ -34,9 +34,6 @@ const nav = [
   { href: "#blog", label: "Blog" },
 ];
 
-const DONATE_LINK =
-  import.meta.env.VITE_DONATE_LINK || "https://buy.stripe.com/14AfZh9Pu2tBeg51GDao804";
-
 const socialLinks = [
   {
     key: "facebook",
@@ -79,6 +76,7 @@ export default function Header() {
   const location = useLocation();
   const isHome = location.pathname === "/";
   const buildTo = (href) => (isHome ? href : `/${href}`);
+  const donatePath = "/donate";
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -191,14 +189,12 @@ export default function Header() {
               </Link>
             ))}
           </nav>
-          <a
-            href={DONATE_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            to={donatePath}
             className="ml-3 hidden h-10 items-center justify-center rounded-full border border-[#d3b57f]/70 bg-[#f1d49e] px-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#22170d] transition-colors duration-200 hover:bg-[#22170d] hover:text-[#f1d49e] lg:inline-flex"
           >
             Donate
-          </a>
+          </Link>
         </div>
 
         {/* Mobile menu */}
@@ -210,7 +206,7 @@ export default function Header() {
             />
             <div
               id="mobile-navigation-menu"
-              className="fixed inset-x-4 top-20 z-50 rounded-3xl border border-[#d3b57f]/25 bg-[linear-gradient(180deg,rgba(16,14,12,0.98)_0%,rgba(8,8,8,0.98)_100%)] p-4 shadow-[0_30px_80px_-35px_rgba(0,0,0,0.9)]"
+              className="fixed inset-x-3 top-[4.5rem] z-50 rounded-3xl border border-[#d3b57f]/25 bg-[linear-gradient(180deg,rgba(16,14,12,0.98)_0%,rgba(8,8,8,0.98)_100%)] p-3 shadow-[0_30px_80px_-35px_rgba(0,0,0,0.9)] sm:inset-x-4 sm:top-20 sm:p-4"
               role="dialog"
               aria-modal="true"
               aria-label="Mobile navigation"
@@ -228,15 +224,15 @@ export default function Header() {
                     {item.label}
                   </Link>
                 ))}
-                <a
-                  href={DONATE_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setOpen(false)}
+                <Link
+                  to={donatePath}
+                  onClick={() => {
+                    setOpen(false);
+                  }}
                   className="rounded-2xl border border-[#d3b57f]/60 bg-[#f1d49e] px-4 py-3 text-center text-xs font-semibold uppercase tracking-[0.14em] text-[#22170d] transition-colors duration-200 hover:bg-[#22170d] hover:text-[#f1d49e]"
                 >
                   Donate
-                </a>
+                </Link>
 
                 <div className="mt-2 border-t border-white/10 pt-3">
                   <Link

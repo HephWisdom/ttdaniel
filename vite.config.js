@@ -9,5 +9,34 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     base,
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+
+            if (
+              id.includes("/react/") ||
+              id.includes("/react-dom/") ||
+              id.includes("/scheduler/") ||
+              id.includes("/react-router/") ||
+              id.includes("/react-router-dom/")
+            ) {
+              return "framework";
+            }
+
+            if (id.includes("/@supabase/")) {
+              return "supabase";
+            }
+
+            if (id.includes("/@stripe/")) {
+              return "payments";
+            }
+
+            return "vendor";
+          },
+        },
+      },
+    },
   };
 });

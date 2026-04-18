@@ -18,6 +18,40 @@ export async function getAdminSession() {
   return data?.session || null;
 }
 
+export async function requireAuthorizedAdmin(session = null) {
+  if (!supabase) return null;
+
+  const activeSession = session || (await getAdminSession());
+  const email = String(activeSession?.user?.email || "").trim().toLowerCase();
+
+  if (!email) {
+    throw new Error("Admin session required.");
+  }
+
+  const { data, error } = await supabase
+    .from("blog_admins")
+    .select("email")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (error) {
+    const message = String(error.message || "").toLowerCase();
+    if (message.includes("blog_admins") || error.code === "42P01") {
+      throw new Error(
+        "Add the blog_admins table and access policy in Supabase before using the admin dashboard."
+      );
+    }
+
+    throw new Error(error.message || "Unable to verify admin access.");
+  }
+
+  if (!data?.email) {
+    throw new Error("This account is not allowed to access the admin dashboard.");
+  }
+
+  return activeSession;
+}
+
 export async function signInAdmin(email, password) {
   if (!supabase) {
     throw new Error("Supabase is not configured.");

@@ -4,12 +4,17 @@ import {
   AnalyticsIcon,
   ArticleIcon,
   CalendarIcon,
+  DonationIcon,
+  DraftIcon,
+  EbookIcon,
   HomeIcon,
   LogoIcon,
+  SubscribersIcon,
 } from "./AdminIcons";
 
 function getSidebarItems(location) {
   const isCreateRoute = location.pathname.startsWith("/admin/blog/create");
+  const isDraftRoute = location.pathname.startsWith("/admin/blog/drafts");
   const isCalendarView = isCreateRoute && location.hash === "#publish-settings";
 
   return [
@@ -28,11 +33,39 @@ function getSidebarItems(location) {
       icon: <AnalyticsIcon />,
     },
     {
+      key: "subscribers",
+      title: "Subscribers",
+      active: location.pathname.startsWith("/admin/blog/subscribers"),
+      onClickPath: "/admin/blog/subscribers",
+      icon: <SubscribersIcon />,
+    },
+    {
+      key: "ebooks",
+      title: "E-book Purchases",
+      active: location.pathname.startsWith("/admin/blog/ebooks"),
+      onClickPath: "/admin/blog/ebooks",
+      icon: <EbookIcon />,
+    },
+    {
+      key: "donations",
+      title: "Donations",
+      active: location.pathname.startsWith("/admin/blog/donations"),
+      onClickPath: "/admin/blog/donations",
+      icon: <DonationIcon />,
+    },
+    {
       key: "articles",
       title: "Articles",
       active: isCreateRoute && !isCalendarView,
       onClickPath: "/admin/blog/create",
       icon: <ArticleIcon />,
+    },
+    {
+      key: "drafts",
+      title: "Drafts",
+      active: isDraftRoute,
+      onClickPath: "/admin/blog/drafts",
+      icon: <DraftIcon />,
     },
     {
       key: "calendar",

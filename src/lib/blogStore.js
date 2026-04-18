@@ -1,6 +1,9 @@
 import { isSupabaseConfigured, supabase } from "./supabaseClient";
 
 const BLOG_STORAGE_KEY = "ttd_blog_posts_v1";
+const BLOG_DRAFT_STORAGE_KEY = "ttd_blog_admin_editor_draft_v2";
+const LEGACY_BLOG_DRAFT_STORAGE_KEY = "ttd_blog_admin_editor_draft_v1";
+const BLOG_DRAFT_MIGRATION_BACKUP_KEY = "ttd_blog_admin_editor_draft_migration_backup_v1";
 const BLOG_COMMENTS_STORAGE_KEY = "ttd_blog_comments_v1";
 const BLOG_IMAGE_BUCKET = "blog-images";
 const BLOG_COMMENT_RATE_KEY = "ttd_blog_comment_last_submit_v1";
@@ -28,6 +31,15 @@ function isMissingBlogPostOptionColumnError(error) {
     message.includes("allow_comments") ||
     message.includes("is_featured") ||
     message.includes("seo_enabled")
+  );
+}
+
+function isMissingBlogDraftTableError(error) {
+  const message = String(error?.message || "").toLowerCase();
+  return (
+    error?.code === "42P01" ||
+    message.includes("blog_drafts") ||
+    message.includes("relation \"public.blog_drafts\" does not exist")
   );
 }
 
@@ -197,6 +209,367 @@ function isPostPublished(post) {
   return publishDate.getTime() <= Date.now();
 }
 
+function normalizeDraft(draft) {
+  if (!draft || typeof draft !== "object") return null;
+
+  return {
+    id: draft.id || "",
+    title: draft.title || "",
+    image: resolveBlogImageUrl(draft.image),
+    excerpt: draft.excerpt || "",
+    content: draft.content || "",
+    author: draft.author || "Admin",
+    tags: Array.isArray(draft.tags) ? draft.tags : [],
+    publishAt: draft.publish_at || draft.publishAt || "",
+    allowComments:
+      typeof draft.allow_comments === "boolean"
+        ? draft.allow_comments
+        : typeof draft.allowComments === "boolean"
+          ? draft.allowComments
+          : true,
+    isFeatured:
+      typeof draft.is_featured === "boolean"
+        ? draft.is_featured
+        : typeof draft.isFeatured === "boolean"
+          ? draft.isFeatured
+          : false,
+    seoEnabled:
+      typeof draft.seo_enabled === "boolean"
+        ? draft.seo_enabled
+        : typeof draft.seoEnabled === "boolean"
+          ? draft.seoEnabled
+          : true,
+    createdAt: draft.created_at || draft.createdAt || null,
+    updatedAt: draft.updated_at || draft.updatedAt || null,
+  };
+}
+
+function normalizeLegacyDraft(draft) {
+  if (!draft || typeof draft !== "object") return null;
+
+  return normalizeDraft({
+    id: draft.id || "legacy-local-draft",
+    title: draft.title || "",
+    image: draft.image || "",
+    excerpt: draft.excerpt || "",
+    content: draft.content || "",
+    author: draft.author || "Admin",
+    tags: Array.isArray(draft.tags) ? draft.tags : [],
+    publishAt: draft.publishAt || "",
+    allowComments:
+      typeof draft.allowComments === "boolean" ? draft.allowComments : true,
+    isFeatured:
+      typeof draft.featuredArticle === "boolean" ? draft.featuredArticle : false,
+    seoEnabled:
+      typeof draft.seoOptimized === "boolean" ? draft.seoOptimized : true,
+    createdAt: draft.createdAt || draft.savedAt || null,
+    updatedAt: draft.updatedAt || draft.savedAt || draft.createdAt || null,
+  });
+}
+
+function readLocalDraftByKey(storageKey, normalizer = normalizeDraft) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const saved = window.localStorage.getItem(storageKey);
+    if (!saved) return null;
+
+    return normalizer(JSON.parse(saved));
+  } catch {
+    return null;
+  }
+}
+
+function getDraftTimestampMs(draft) {
+  const updated = toValidDate(draft?.updatedAt || draft?.createdAt);
+  return updated ? updated.getTime() : Number.NaN;
+}
+
+function getDraftMeaningfulFieldScore(draft) {
+  if (!draft) return 0;
+
+  let score = 0;
+  if (String(draft.title || "").trim()) score += 1;
+  if (String(draft.image || "").trim()) score += 1;
+  if (String(draft.excerpt || "").trim()) score += 1;
+  if (String(draft.content || "").trim()) score += 2;
+  if (String(draft.publishAt || "").trim()) score += 1;
+  if (Array.isArray(draft.tags) && draft.tags.some((tag) => String(tag || "").trim())) score += 1;
+  if (String(draft.author || "").trim() && String(draft.author || "").trim() !== "Admin") score += 1;
+  return score;
+}
+
+function combineDraftTags(primaryTags = [], fallbackTags = []) {
+  const seen = new Set();
+
+  return [...primaryTags, ...fallbackTags]
+    .map((tag) => String(tag || "").trim())
+    .filter((tag) => {
+      if (!tag) return false;
+
+      const key = tag.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function pickPreferredDraft(firstDraft, secondDraft) {
+  if (!firstDraft) return secondDraft || null;
+  if (!secondDraft) return firstDraft;
+
+  const firstTimestamp = getDraftTimestampMs(firstDraft);
+  const secondTimestamp = getDraftTimestampMs(secondDraft);
+  const hasFirstTimestamp = Number.isFinite(firstTimestamp);
+  const hasSecondTimestamp = Number.isFinite(secondTimestamp);
+
+  if (hasFirstTimestamp && hasSecondTimestamp && firstTimestamp !== secondTimestamp) {
+    return firstTimestamp > secondTimestamp ? firstDraft : secondDraft;
+  }
+
+  if (hasFirstTimestamp !== hasSecondTimestamp) {
+    return hasFirstTimestamp ? firstDraft : secondDraft;
+  }
+
+  return getDraftMeaningfulFieldScore(firstDraft) >= getDraftMeaningfulFieldScore(secondDraft)
+    ? firstDraft
+    : secondDraft;
+}
+
+function mergeDrafts(primaryDraft, fallbackDraft) {
+  if (!primaryDraft) return fallbackDraft || null;
+  if (!fallbackDraft) return primaryDraft;
+
+  const createdAtValues = [primaryDraft.createdAt, fallbackDraft.createdAt]
+    .map((value) => toValidDate(value))
+    .filter(Boolean)
+    .sort((first, second) => first.getTime() - second.getTime());
+  const updatedAtValues = [
+    primaryDraft.updatedAt,
+    fallbackDraft.updatedAt,
+    primaryDraft.createdAt,
+    fallbackDraft.createdAt,
+  ]
+    .map((value) => toValidDate(value))
+    .filter(Boolean)
+    .sort((first, second) => first.getTime() - second.getTime());
+
+  const primaryAuthor = String(primaryDraft.author || "").trim();
+  const fallbackAuthor = String(fallbackDraft.author || "").trim();
+
+  return normalizeDraft({
+    id: primaryDraft.id || fallbackDraft.id || "",
+    title: String(primaryDraft.title || "").trim() ? primaryDraft.title : fallbackDraft.title || "",
+    image: String(primaryDraft.image || "").trim() ? primaryDraft.image : fallbackDraft.image || "",
+    excerpt: String(primaryDraft.excerpt || "").trim()
+      ? primaryDraft.excerpt
+      : fallbackDraft.excerpt || "",
+    content: String(primaryDraft.content || "").trim()
+      ? primaryDraft.content
+      : fallbackDraft.content || "",
+    author:
+      primaryAuthor && primaryAuthor !== "Admin"
+        ? primaryDraft.author
+        : fallbackAuthor || primaryDraft.author || "Admin",
+    tags: combineDraftTags(primaryDraft.tags, fallbackDraft.tags),
+    publishAt: String(primaryDraft.publishAt || "").trim()
+      ? primaryDraft.publishAt
+      : fallbackDraft.publishAt || "",
+    allowComments:
+      typeof primaryDraft.allowComments === "boolean"
+        ? primaryDraft.allowComments
+        : fallbackDraft.allowComments !== false,
+    isFeatured:
+      typeof primaryDraft.isFeatured === "boolean"
+        ? primaryDraft.isFeatured
+        : Boolean(fallbackDraft.isFeatured),
+    seoEnabled:
+      typeof primaryDraft.seoEnabled === "boolean"
+        ? primaryDraft.seoEnabled
+        : fallbackDraft.seoEnabled !== false,
+    createdAt:
+      createdAtValues[0]?.toISOString() ||
+      primaryDraft.createdAt ||
+      fallbackDraft.createdAt ||
+      null,
+    updatedAt:
+      updatedAtValues[updatedAtValues.length - 1]?.toISOString() ||
+      primaryDraft.updatedAt ||
+      fallbackDraft.updatedAt ||
+      null,
+  });
+}
+
+function loadLocalBlogDraft() {
+  const currentDraft = readLocalDraftByKey(BLOG_DRAFT_STORAGE_KEY, normalizeDraft);
+  const legacyDraft = readLocalDraftByKey(LEGACY_BLOG_DRAFT_STORAGE_KEY, normalizeLegacyDraft);
+
+  if (!currentDraft) return legacyDraft;
+  if (!legacyDraft) return currentDraft;
+
+  const preferredDraft = pickPreferredDraft(currentDraft, legacyDraft);
+  const fallbackDraft = preferredDraft === currentDraft ? legacyDraft : currentDraft;
+  return mergeDrafts(preferredDraft, fallbackDraft);
+}
+
+function saveLocalBlogDraft(draft) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BLOG_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    window.localStorage.removeItem(LEGACY_BLOG_DRAFT_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveLocalBlogDraftMigrationBackup(payload) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BLOG_DRAFT_MIGRATION_BACKUP_KEY, JSON.stringify(payload));
+  } catch {
+    // Ignore local backup write failures.
+  }
+}
+
+function clearLocalBlogDraft({ includeBackup = false } = {}) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(BLOG_DRAFT_STORAGE_KEY);
+    window.localStorage.removeItem(LEGACY_BLOG_DRAFT_STORAGE_KEY);
+    if (includeBackup) {
+      window.localStorage.removeItem(BLOG_DRAFT_MIGRATION_BACKUP_KEY);
+    }
+  } catch {
+    // Ignore local clear failures.
+  }
+}
+
+async function getAuthenticatedAdminUserId() {
+  if (!isSupabaseConfigured || !supabase) return "";
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error) {
+    throw new Error(error.message || "Unable to verify the signed-in admin account.");
+  }
+
+  return String(data?.user?.id || "").trim();
+}
+
+function buildDraftPayload(input) {
+  const publishAtIso = toPublishAtIso(input.publishAt);
+  const allowComments =
+    typeof input.allowComments === "boolean" ? input.allowComments : true;
+  const isFeatured =
+    typeof input.isFeatured === "boolean"
+      ? input.isFeatured
+      : input.featuredArticle === true;
+  const seoEnabled =
+    typeof input.seoEnabled === "boolean"
+      ? input.seoEnabled
+      : input.seoOptimized !== false;
+
+  return {
+    title: input.title?.trim() || "",
+    image: input.image?.trim() || "",
+    excerpt: input.excerpt?.trim() || "",
+    content: input.content?.trim() || "",
+    author: input.author?.trim() || "Admin",
+    tags: Array.isArray(input.tags) ? input.tags : [],
+    publish_at: publishAtIso,
+    allow_comments: allowComments,
+    is_featured: isFeatured,
+    seo_enabled: seoEnabled,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+function buildLocalBlogDraftSnapshot(input, existingDraft = null) {
+  const payload = buildDraftPayload(input);
+
+  return normalizeDraft({
+    id: existingDraft?.id || "local-shared-draft",
+    title: payload.title,
+    image: payload.image,
+    excerpt: payload.excerpt,
+    content: payload.content,
+    author: payload.author,
+    tags: payload.tags,
+    publish_at: payload.publish_at,
+    allow_comments: payload.allow_comments,
+    is_featured: payload.is_featured,
+    seo_enabled: payload.seo_enabled,
+    created_at: existingDraft?.createdAt || payload.updated_at,
+    updated_at: payload.updated_at,
+  });
+}
+
+function withLocalDraftBackupMessage(message, localSaved) {
+  const baseMessage = String(message || "Unable to save the shared draft.").trim();
+  if (!localSaved) return baseMessage;
+  if (/local|backup/i.test(baseMessage)) return baseMessage;
+  return `${baseMessage} A local backup was updated on this device.`;
+}
+
+async function upsertSupabaseBlogDraft(ownerUserId, input) {
+  const payload = buildDraftPayload(input);
+
+  const { data, error } = await supabase
+    .from("blog_drafts")
+    .upsert(
+      {
+        owner_user_id: ownerUserId,
+        ...payload,
+      },
+      {
+        onConflict: "owner_user_id",
+      }
+    )
+    .select(BLOG_DRAFT_SELECT_FIELDS)
+    .maybeSingle();
+
+  if (!error && data) {
+    return normalizeDraft(data);
+  }
+
+  if (error && isMissingBlogDraftTableError(error)) {
+    throw new Error(
+      'Add the "blog_drafts" table in Supabase before using shared drafts.'
+    );
+  }
+
+  throw new Error(error?.message || "Unable to save the shared draft.");
+}
+
+async function migrateLocalDraftToSupabase(ownerUserId, remoteDraft = null) {
+  const localDraft = loadLocalBlogDraft();
+  if (!localDraft && !remoteDraft) return null;
+  if (!localDraft) {
+    saveLocalBlogDraft(remoteDraft);
+    return remoteDraft;
+  }
+
+  const preferredDraft = remoteDraft
+    ? pickPreferredDraft(localDraft, remoteDraft)
+    : localDraft;
+  const fallbackDraft = remoteDraft
+    ? preferredDraft === localDraft
+      ? remoteDraft
+      : localDraft
+    : null;
+  const mergedDraft = fallbackDraft ? mergeDrafts(preferredDraft, fallbackDraft) : preferredDraft;
+  const savedDraft = await upsertSupabaseBlogDraft(ownerUserId, mergedDraft);
+
+  saveLocalBlogDraftMigrationBackup({
+    migratedAt: new Date().toISOString(),
+    localDraft,
+    remoteDraft,
+    mergedDraft: savedDraft,
+  });
+  saveLocalBlogDraft(savedDraft);
+  return savedDraft;
+}
+
 function normalizeComment(comment) {
   return {
     id: comment.id,
@@ -245,6 +618,8 @@ const BLOG_POST_SELECT_FIELDS =
   "id,title,image,excerpt,content,author,tags,created_at,subscriber_notified_at,allow_comments,is_featured,seo_enabled";
 const BLOG_POST_SELECT_FIELDS_LEGACY =
   "id,title,image,excerpt,content,author,tags,created_at,subscriber_notified_at";
+const BLOG_DRAFT_SELECT_FIELDS =
+  "id,title,image,excerpt,content,author,tags,publish_at,allow_comments,is_featured,seo_enabled,created_at,updated_at,owner_user_id";
 
 function loadLocalCommentsMap() {
   if (typeof window === "undefined") return {};
@@ -466,6 +841,43 @@ export async function fetchBlogPosts() {
   return Array.isArray(legacyData) ? legacyData.map(normalizePost) : [];
 }
 
+export async function fetchBlogDraft() {
+  const localDraft = loadLocalBlogDraft();
+
+  if (!isSupabaseConfigured || !supabase) {
+    return localDraft;
+  }
+
+  try {
+    const ownerUserId = await getAuthenticatedAdminUserId();
+    if (!ownerUserId) return localDraft;
+
+    const { data, error } = await supabase
+      .from("blog_drafts")
+      .select(BLOG_DRAFT_SELECT_FIELDS)
+      .eq("owner_user_id", ownerUserId)
+      .maybeSingle();
+
+    if (!error) {
+      const remoteDraft = data ? normalizeDraft(data) : null;
+      if (!localDraft && !remoteDraft) return null;
+      return await migrateLocalDraftToSupabase(ownerUserId, remoteDraft);
+    }
+
+    if (isMissingBlogDraftTableError(error)) {
+      return localDraft;
+    }
+
+    throw new Error(error.message || "Unable to load the shared draft.");
+  } catch (error) {
+    if (localDraft) {
+      return localDraft;
+    }
+
+    throw error;
+  }
+}
+
 export async function fetchPublishedBlogPosts() {
   const posts = await fetchBlogPosts();
   return posts.filter((post) => isPostPublished(post));
@@ -589,6 +1001,28 @@ export async function createBlogPost(input) {
   return normalizePost(legacyData);
 }
 
+export async function saveBlogDraft(input) {
+  const localDraft = buildLocalBlogDraftSnapshot(input, loadLocalBlogDraft());
+  const localSaved = saveLocalBlogDraft(localDraft);
+
+  if (!isSupabaseConfigured || !supabase) {
+    return localDraft;
+  }
+
+  try {
+    const ownerUserId = await getAuthenticatedAdminUserId();
+    if (!ownerUserId) {
+      throw new Error("Sign in again before saving a shared draft.");
+    }
+
+    const savedDraft = await upsertSupabaseBlogDraft(ownerUserId, input);
+    saveLocalBlogDraft(savedDraft);
+    return savedDraft;
+  } catch (error) {
+    throw new Error(withLocalDraftBackupMessage(error?.message, localSaved));
+  }
+}
+
 export async function updateBlogPost(postId, input) {
   if (!postId) {
     throw new Error("Missing post id.");
@@ -678,6 +1112,29 @@ export async function updateBlogPost(postId, input) {
   }
 
   return normalizePost(legacyData);
+}
+
+export async function deleteBlogDraft() {
+  clearLocalBlogDraft();
+
+  if (!isSupabaseConfigured || !supabase) {
+    return;
+  }
+
+  const ownerUserId = await getAuthenticatedAdminUserId();
+  if (!ownerUserId) return;
+
+  const { error } = await supabase.from("blog_drafts").delete().eq("owner_user_id", ownerUserId);
+
+  if (!error) {
+    return;
+  }
+
+  if (isMissingBlogDraftTableError(error)) {
+    return;
+  }
+
+  throw new Error(error.message || "Unable to clear the shared draft.");
 }
 
 export async function deleteBlogPost(postId) {

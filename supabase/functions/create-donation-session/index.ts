@@ -50,6 +50,7 @@ function jsonResponse(
     status,
     headers: {
       ...buildCorsHeaders(siteUrl, request),
+      "Cache-Control": "no-store",
       "Content-Type": "application/json",
     },
   });
@@ -80,14 +81,7 @@ function normalizePagePath(value: unknown) {
   if (typeof value !== "string") return "/";
   const trimmed = value.trim();
   if (!trimmed.startsWith("/")) return "/";
-  return trimmed.replace(/[\r\n]/g, "") || "/";
-}
-
-function buildReturnUrl(siteUrl: string, pagePath: string) {
-  const url = new URL(pagePath, siteUrl);
-  url.searchParams.set("donation_status", "return");
-  url.searchParams.set("donation_session_id", "{CHECKOUT_SESSION_ID}");
-  return url.toString();
+  return trimmed.replace(/[\r\n]/g, "").slice(0, 500) || "/";
 }
 
 Deno.serve(async (request) => {
@@ -108,7 +102,7 @@ Deno.serve(async (request) => {
     return jsonResponse(
       500,
       {
-        error: "Set SITE_URL and STRIPE_SECRET_KEY in Supabase function secrets before enabling donations.",
+        error: "Donation payments are not configured yet.",
       },
       siteUrl,
       request
@@ -138,17 +132,20 @@ Deno.serve(async (request) => {
   const pagePath = normalizePagePath(body?.pagePath);
   const stripe = new Stripe(stripeSecretKey);
   const isRecurring = frequency !== "one_time";
-  const returnUrl = buildReturnUrl(siteUrl, pagePath);
   const interval = isRecurring ? (frequency as "week" | "month" | "year") : undefined;
 
   try {
     const session = await stripe.checkout.sessions.create({
       ui_mode: "embedded_page",
+      redirect_on_completion: "never",
       mode: isRecurring ? "subscription" : "payment",
       submit_type: isRecurring ? undefined : "donate",
-      return_url: returnUrl,
       billing_address_collection: "auto",
       customer_creation: isRecurring ? undefined : "always",
+      // Keep the embedded donation flow on cards only.
+      // Embedded Checkout auto-enables one-click wallets and Link, which require
+      // HTTPS plus a registered domain and can fail during localhost testing.
+      payment_method_types: ["card"],
       line_items: [
         {
           quantity: 1,
@@ -169,6 +166,7 @@ Deno.serve(async (request) => {
         amount: String(amount),
         donation_kind: "donation",
         frequency,
+        page_path: pagePath,
         preset_amount: DONATION_PRESETS.has(amount) ? "true" : "false",
       },
     });
@@ -176,7 +174,7 @@ Deno.serve(async (request) => {
     if (!session.client_secret) {
       return jsonResponse(
         502,
-        { error: "Stripe did not return a checkout client secret." },
+        { error: "Unable to prepare the secure checkout." },
         siteUrl,
         request
       );
@@ -186,6 +184,7 @@ Deno.serve(async (request) => {
       200,
       {
         clientSecret: session.client_secret,
+        sessionId: session.id,
       },
       siteUrl,
       request
@@ -194,10 +193,7 @@ Deno.serve(async (request) => {
     return jsonResponse(
       502,
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to create the donation checkout session.",
+        error: "Unable to create the donation checkout session.",
       },
       siteUrl,
       request

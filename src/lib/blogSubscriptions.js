@@ -7,6 +7,7 @@ import { isSupabaseConfigured, supabase } from "./supabaseClient";
 
 const SUBSCRIBER_NAME_MAX_LENGTH = 80;
 const SUBSCRIBER_EMAIL_MAX_LENGTH = 160;
+const SUBSCRIBER_HONEYPOT_MAX_LENGTH = 120;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 
 function stripControlCharacters(value) {
@@ -85,6 +86,7 @@ function prepareSubscriberPayload(input) {
   return {
     name,
     email,
+    website: sanitizeSubscriptionText(input?.website, SUBSCRIBER_HONEYPOT_MAX_LENGTH),
     status: "active",
     source: "website",
   };

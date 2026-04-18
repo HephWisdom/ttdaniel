@@ -73,7 +73,7 @@ function normalizePagePath(value = "/") {
 
 export async function createDonationCheckoutSession({ amount, frequency, pagePath }) {
   if (!isSupabaseConfigured || !supabase) {
-    throw new Error("Donations require Supabase and Stripe configuration.");
+    throw new Error("Donation payments are not configured yet.");
   }
 
   const payload = {
@@ -91,18 +91,20 @@ export async function createDonationCheckoutSession({ amount, frequency, pagePat
   }
 
   const clientSecret = String(data?.clientSecret || "").trim();
-  if (!clientSecret) {
-    throw new Error("Stripe did not return a checkout client secret.");
+  const sessionId = String(data?.sessionId || "").trim();
+  if (!clientSecret || !sessionId) {
+    throw new Error("Unable to prepare the secure checkout.");
   }
 
   return {
     clientSecret,
+    sessionId,
   };
 }
 
 export async function fetchDonationSessionStatus(sessionId) {
   if (!isSupabaseConfigured || !supabase) {
-    throw new Error("Donations require Supabase and Stripe configuration.");
+    throw new Error("Donation payments are not configured yet.");
   }
 
   const normalizedSessionId = String(sessionId || "").trim();
@@ -122,6 +124,8 @@ export async function fetchDonationSessionStatus(sessionId) {
     amountTotal: Number(data?.amountTotal || 0),
     currency: String(data?.currency || "usd").toLowerCase(),
     customerEmail: String(data?.customerEmail || "").trim().toLowerCase(),
+    emailMessage: String(data?.emailMessage || "").trim(),
+    emailSent: Boolean(data?.emailSent),
     frequency: normalizeDonationFrequency(data?.frequency),
     mode: String(data?.mode || "").trim(),
     paymentStatus: String(data?.paymentStatus || "").trim(),

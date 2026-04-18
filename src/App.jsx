@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Routes, Route, useLocation } from "react-router-dom";
 import Header from "./components/Header";
+import CookieConsent from "./components/CookieConsent";
 import SiteAnalyticsTracker from "./components/SiteAnalyticsTracker";
 import ScrollToTop from "./components/ScrollToTop";
 import Hero from "./components/Hero";
@@ -13,12 +14,14 @@ import Footer from "./components/Footer";
 import Blog_post from "./components/Blog_post";
 
 const BibleStudyDetails = lazy(() => import("./pages/BibleStudyDetails"));
+const Donate = lazy(() => import("./pages/Donate"));
 const Gallery = lazy(() => import("./pages/Gallery"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const InterludeReadMore = lazy(() => import("./pages/InterludeReadMore"));
 const AdminBlog = lazy(() => import("./pages/AdminBlog"));
 const BlogDetails = lazy(() => import("./pages/BlogDetails"));
 const BlogAll = lazy(() => import("./pages/BlogAll"));
+const PrivacyCookies = lazy(() => import("./pages/PrivacyCookies"));
 
 function Home() {
   return (
@@ -67,11 +70,14 @@ export default function App() {
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/blog" element={<BlogAll />} />
           <Route path="/blog/:postId" element={<BlogDetails />} />
+          <Route path="/donate" element={<Donate />} />
+          <Route path="/privacy-cookies" element={<PrivacyCookies />} />
           <Route path="/admin/blog/*" element={<AdminBlog />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
       {!hideFooter && <Footer />}
+      {!isAdminBlog && <CookieConsent />}
     </div>
   );
 }

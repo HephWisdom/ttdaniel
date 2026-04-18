@@ -1,12 +1,10 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const SUBSCRIBE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const SUBSCRIBE_RATE_LIMIT_ACTOR_MAX = 12;
+const SUBSCRIBE_RATE_LIMIT_EMAIL_MAX = 4;
+const SUBSCRIBE_HONEYPOT_MAX_LENGTH = 200;
 
 function normalizeEnvValue(value: string | undefined) {
   const trimmed = String(value || "").trim();
@@ -19,11 +17,41 @@ function normalizeEnvValue(value: string | undefined) {
   return trimmed;
 }
 
-function jsonResponse(status: number, body: Record<string, unknown>) {
+function normalizeOrigin(siteUrl: string) {
+  try {
+    return new URL(siteUrl).origin;
+  } catch {
+    return "";
+  }
+}
+
+function buildCorsHeaders(siteUrl: string, request: Request) {
+  const siteOrigin = normalizeOrigin(siteUrl);
+  const requestOrigin = normalizeEnvValue(request.headers.get("Origin") || undefined);
+  const allowOrigin =
+    requestOrigin && (requestOrigin === siteOrigin || requestOrigin.startsWith("http://localhost:"))
+      ? requestOrigin
+      : siteOrigin || "*";
+
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    Vary: "Origin",
+  };
+}
+
+function jsonResponse(
+  status: number,
+  body: Record<string, unknown>,
+  siteUrl: string,
+  request: Request
+) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...buildCorsHeaders(siteUrl, request),
+      "Cache-Control": "no-store",
       "Content-Type": "application/json",
     },
   });
@@ -51,6 +79,94 @@ function sanitizeText(value: unknown, maxLength: number) {
   }
 
   return sanitized;
+}
+
+function getRequestClientIp(request: Request) {
+  const forwardedFor = normalizeEnvValue(request.headers.get("x-forwarded-for") || undefined);
+  if (forwardedFor) {
+    return forwardedFor.split(",")[0]?.trim() || "";
+  }
+
+  return (
+    normalizeEnvValue(request.headers.get("cf-connecting-ip") || undefined) ||
+    normalizeEnvValue(request.headers.get("x-real-ip") || undefined) ||
+    ""
+  );
+}
+
+async function sha256Hex(value: string) {
+  const encoded = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function isMissingRateLimitTableError(error: { code?: string; message?: string } | null | undefined) {
+  const message = String(error?.message || "").toLowerCase();
+  return error?.code === "42P01" || message.includes("edge_request_guards");
+}
+
+async function ensureRequestWithinRateLimit({
+  adminClient,
+  actorHash,
+  emailHash,
+}: {
+  adminClient: ReturnType<typeof createClient>;
+  actorHash: string;
+  emailHash: string;
+}) {
+  const cutoffIso = new Date(Date.now() - SUBSCRIBE_RATE_LIMIT_WINDOW_MS).toISOString();
+
+  const checks = [
+    {
+      scope: "actor",
+      subjectHash: actorHash,
+      limit: SUBSCRIBE_RATE_LIMIT_ACTOR_MAX,
+    },
+    {
+      scope: "email",
+      subjectHash: emailHash,
+      limit: SUBSCRIBE_RATE_LIMIT_EMAIL_MAX,
+    },
+  ];
+
+  for (const check of checks) {
+    const { count, error } = await adminClient
+      .from("edge_request_guards")
+      .select("id", { count: "exact", head: true })
+      .eq("endpoint", "subscribe_to_blog")
+      .eq("scope", check.scope)
+      .eq("subject_hash", check.subjectHash)
+      .gte("created_at", cutoffIso);
+
+    if (error) {
+      if (isMissingRateLimitTableError(error)) {
+        return;
+      }
+
+      throw new Error(error.message || "Unable to verify request rate limit.");
+    }
+
+    if (Number(count || 0) >= check.limit) {
+      throw new Error("Too many subscription attempts. Please try again later.");
+    }
+  }
+
+  const { error: insertError } = await adminClient.from("edge_request_guards").insert([
+    {
+      endpoint: "subscribe_to_blog",
+      scope: "actor",
+      subject_hash: actorHash,
+    },
+    {
+      endpoint: "subscribe_to_blog",
+      scope: "email",
+      subject_hash: emailHash,
+    },
+  ]);
+
+  if (insertError && !isMissingRateLimitTableError(insertError)) {
+    throw new Error(insertError.message || "Unable to store request rate limit state.");
+  }
 }
 
 function buildConfirmationHtml(siteUrl: string, subscriberName: string) {
@@ -168,52 +284,67 @@ async function sendConfirmationEmail({
 }
 
 Deno.serve(async (request) => {
+  const siteUrl = normalizeEnvValue(Deno.env.get("SITE_URL"));
+
   if (request.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: buildCorsHeaders(siteUrl, request) });
   }
 
   if (request.method !== "POST") {
-    return jsonResponse(405, { error: "Method not allowed." });
+    return jsonResponse(405, { error: "Method not allowed." }, siteUrl, request);
   }
 
   const supabaseUrl = normalizeEnvValue(Deno.env.get("SUPABASE_URL"));
   const serviceRoleKey = normalizeEnvValue(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
   const resendApiKey = normalizeEnvValue(Deno.env.get("RESEND_API_KEY"));
   const senderEmail = normalizeEnvValue(Deno.env.get("BLOG_EMAIL_FROM"));
-  const siteUrl = normalizeEnvValue(Deno.env.get("SITE_URL"));
 
   if (!supabaseUrl || !serviceRoleKey) {
     return jsonResponse(500, {
       error: "Supabase function secrets are incomplete.",
-    });
+    }, siteUrl, request);
   }
 
   if (!resendApiKey || !senderEmail || !siteUrl) {
     return jsonResponse(500, {
       error: "Set RESEND_API_KEY, BLOG_EMAIL_FROM, and SITE_URL before enabling subscriptions.",
-    });
+    }, siteUrl, request);
   }
 
-  let body: { name?: string; email?: string };
+  let body: { name?: string; email?: string; website?: string };
   try {
     body = await request.json();
   } catch {
-    return jsonResponse(400, { error: "Request body must be valid JSON." });
+    return jsonResponse(400, { error: "Request body must be valid JSON." }, siteUrl, request);
   }
 
   const name = sanitizeText(body?.name, 80);
   const email = sanitizeText(body?.email, 160).toLowerCase();
+  const honeypot = sanitizeText(body?.website, SUBSCRIBE_HONEYPOT_MAX_LENGTH);
+
+  if (honeypot) {
+    return jsonResponse(
+      200,
+      {
+        alreadySubscribed: false,
+        confirmationEmailSent: false,
+        message: "You are subscribed. Check your inbox for the confirmation email.",
+      },
+      siteUrl,
+      request
+    );
+  }
 
   if (!name || !email) {
-    return jsonResponse(400, { error: "Name and email are required." });
+    return jsonResponse(400, { error: "Name and email are required." }, siteUrl, request);
   }
 
   if (name.length < 2) {
-    return jsonResponse(400, { error: "Enter your full name." });
+    return jsonResponse(400, { error: "Enter your full name." }, siteUrl, request);
   }
 
   if (!EMAIL_PATTERN.test(email)) {
-    return jsonResponse(400, { error: "Enter a valid email address." });
+    return jsonResponse(400, { error: "Enter a valid email address." }, siteUrl, request);
   }
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -222,6 +353,38 @@ Deno.serve(async (request) => {
       autoRefreshToken: false,
     },
   });
+
+  const requestClientIp = getRequestClientIp(request);
+  const requestUserAgent = normalizeEnvValue(request.headers.get("user-agent") || undefined);
+  const actorFingerprintSource = [
+    requestClientIp,
+    requestUserAgent,
+    normalizeEnvValue(request.headers.get("Origin") || undefined),
+  ]
+    .filter(Boolean)
+    .join("|");
+  const actorHash = await sha256Hex(actorFingerprintSource || `anonymous|${email}`);
+  const emailHash = await sha256Hex(email);
+
+  try {
+    await ensureRequestWithinRateLimit({
+      adminClient,
+      actorHash,
+      emailHash,
+    });
+  } catch (error) {
+    return jsonResponse(
+      429,
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Too many subscription attempts. Please try again later.",
+      },
+      siteUrl,
+      request
+    );
+  }
 
   const { data: existingData, error: existingError } = await adminClient
     .from("blog_subscribers")
@@ -235,7 +398,7 @@ Deno.serve(async (request) => {
       error: message.includes("blog_subscribers")
         ? "Add the blog_subscribers table in Supabase before enabling subscriptions."
         : message || "Unable to check the existing subscription.",
-    });
+    }, siteUrl, request);
   }
 
   const existing = existingData as { id: string; status: string } | null;
@@ -253,14 +416,14 @@ Deno.serve(async (request) => {
         alreadySubscribed: true,
         confirmationEmailSent: true,
         message: "This email is already subscribed. We have sent the confirmation email again.",
-      });
+      }, siteUrl, request);
     } catch (error) {
       return jsonResponse(502, {
         error:
           error instanceof Error
             ? error.message
             : "Subscription exists, but the confirmation email could not be sent.",
-      });
+      }, siteUrl, request);
     }
   }
 
@@ -278,7 +441,7 @@ Deno.serve(async (request) => {
     if (updateError) {
       return jsonResponse(500, {
         error: updateError.message || "Unable to reactivate the subscription.",
-      });
+      }, siteUrl, request);
     }
   } else {
     const { error: insertError } = await adminClient.from("blog_subscribers").insert({
@@ -304,20 +467,20 @@ Deno.serve(async (request) => {
             alreadySubscribed: true,
             confirmationEmailSent: true,
             message: "This email is already subscribed. We have sent the confirmation email again.",
-          });
+          }, siteUrl, request);
         } catch (error) {
           return jsonResponse(502, {
             error:
               error instanceof Error
                 ? error.message
                 : "Subscription exists, but the confirmation email could not be sent.",
-          });
+          }, siteUrl, request);
         }
       }
 
       return jsonResponse(500, {
         error: insertError.message || "Unable to save the subscription.",
-      });
+      }, siteUrl, request);
     }
   }
 
@@ -334,13 +497,13 @@ Deno.serve(async (request) => {
       alreadySubscribed: false,
       confirmationEmailSent: true,
       message: "You are subscribed. Check your inbox for the confirmation email.",
-    });
+    }, siteUrl, request);
   } catch (error) {
     return jsonResponse(502, {
       error:
         error instanceof Error
           ? error.message
           : "Your subscription was saved, but the confirmation email could not be sent.",
-    });
+    }, siteUrl, request);
   }
 });

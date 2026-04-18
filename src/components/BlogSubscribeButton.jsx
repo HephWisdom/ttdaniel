@@ -12,7 +12,11 @@ export default function BlogSubscribeButton({
   helperClassName = "",
 }) {
   const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
-  const [subscriptionForm, setSubscriptionForm] = useState({ name: "", email: "" });
+  const [subscriptionForm, setSubscriptionForm] = useState({
+    name: "",
+    email: "",
+    website: "",
+  });
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState("");
   const [subscriptionToast, setSubscriptionToast] = useState(null);
@@ -24,7 +28,7 @@ export default function BlogSubscribeButton({
       if (event.key === "Escape") {
         setIsSubscribeModalOpen(false);
         setSubscriptionError("");
-        setSubscriptionForm({ name: "", email: "" });
+        setSubscriptionForm({ name: "", email: "", website: "" });
       }
     };
 
@@ -54,7 +58,7 @@ export default function BlogSubscribeButton({
 
     try {
       const result = await createBlogSubscriber(subscriptionForm);
-      setSubscriptionForm({ name: "", email: "" });
+      setSubscriptionForm({ name: "", email: "", website: "" });
       setIsSubscribeModalOpen(false);
       setSubscriptionToast(
         result.alreadySubscribed
@@ -94,7 +98,7 @@ export default function BlogSubscribeButton({
   const closeSubscribeModal = () => {
     setIsSubscribeModalOpen(false);
     setSubscriptionError("");
-    setSubscriptionForm({ name: "", email: "" });
+    setSubscriptionForm({ name: "", email: "", website: "" });
   };
 
   return (
@@ -156,6 +160,20 @@ export default function BlogSubscribeButton({
               </p>
 
               <form onSubmit={handleSubscribe} className="mt-8 grid gap-4">
+                <div className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+                  <label htmlFor="blog-subscribe-website">Website</label>
+                  <input
+                    id="blog-subscribe-website"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={subscriptionForm.website}
+                    onChange={(event) =>
+                      setSubscriptionForm((prev) => ({ ...prev, website: event.target.value }))
+                    }
+                  />
+                </div>
+
                 <label className="block">
                   <span className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.12em] text-black/55">
                     Name

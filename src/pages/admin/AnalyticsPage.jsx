@@ -4,17 +4,6 @@ import blogFallbackImage from "../../assets/ttdaniel1.png";
 import useAdminBlog from "../../components/admin/useAdminBlog";
 import { sortBlogPosts } from "../../lib/blogStore";
 
-function formatSubscriberDate(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Recently";
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
-}
-
 function formatPostDate(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Draft";
@@ -39,18 +28,35 @@ function formatCompactNumber(value) {
   }).format(Number.isFinite(Number(value)) ? Number(value) : 0);
 }
 
+function AnalyticsList({ emptyLabel = "Awaiting data.", items = [], valueLabel = "count" }) {
+  if (!items.length) {
+    return <p className="blog-admin-empty-state">{emptyLabel}</p>;
+  }
+
+  return (
+    <div className="blog-admin-analytics-detail-list">
+      {items.map((item) => (
+        <div key={`${item.label}-${item.rawLabel || item.path || item.count}`} className="blog-admin-analytics-detail-row">
+          <span>{item.label}</span>
+          <strong>
+            {formatCompactNumber(item.count)} {valueLabel}
+            {typeof item.percentage === "number" ? ` · ${item.percentage}%` : ""}
+          </strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   const navigate = useNavigate();
   const {
     posts,
     analyticsSummary,
-    subscribers,
     pendingComments,
-    subscribersError,
     pendingCommentsError,
     isLoadingAnalytics,
     isLoadingPosts,
-    isLoadingSubscribers,
     isLoadingPendingComments,
     isDeletingId,
     isSendingPostId,
@@ -60,11 +66,9 @@ export default function AnalyticsPage() {
     sendPost,
     approveComment,
     declineComment,
-    refreshSubscribers,
     refreshPendingComments,
   } = useAdminBlog();
   const [isVisible, setIsVisible] = useState(false);
-  const [subscriberQuery, setSubscriberQuery] = useState("");
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -75,22 +79,10 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    refreshSubscribers();
     refreshPendingComments();
-  }, [refreshPendingComments, refreshSubscribers]);
+  }, [refreshPendingComments]);
 
   const sortedPosts = useMemo(() => sortBlogPosts(posts), [posts]);
-  const filteredSubscribers = useMemo(() => {
-    const query = subscriberQuery.trim().toLowerCase();
-    if (!query) return subscribers;
-
-    return subscribers.filter((subscriber) =>
-      [subscriber.name, subscriber.email, subscriber.status, subscriber.source]
-        .join(" ")
-        .toLowerCase()
-        .includes(query)
-    );
-  }, [subscriberQuery, subscribers]);
   const analyticsPostMap = useMemo(
     () =>
       new Map(
@@ -131,6 +123,21 @@ export default function AnalyticsPage() {
         y: 130 - (trafficSeries[focusIndex].count / chartMax) * 90,
       }
     : { x: 310, y: 60 };
+  const behaviorCards = analyticsSummary?.behaviorCards || [];
+  const topPages = analyticsSummary?.topPages || [];
+  const trafficSources = analyticsSummary?.trafficSources || [];
+  const referrers = analyticsSummary?.referrers || [];
+  const deviceBreakdown = analyticsSummary?.deviceBreakdown || [];
+  const browserBreakdown = analyticsSummary?.browserBreakdown || [];
+  const osBreakdown = analyticsSummary?.osBreakdown || [];
+  const languageBreakdown = analyticsSummary?.languageBreakdown || [];
+  const timezoneBreakdown = analyticsSummary?.timezoneBreakdown || [];
+  const scrollDepth = analyticsSummary?.scrollDepth || [];
+  const engagementTime = analyticsSummary?.engagementTime || [];
+  const topClickTargets = analyticsSummary?.topClickTargets || [];
+  const topJourneys = analyticsSummary?.sessionInsights?.topJourneys || [];
+  const hourlyActivity = analyticsSummary?.hourlyActivity || [];
+  const hourlyMax = Math.max(...hourlyActivity.map((item) => item.count), 1);
 
   return (
     <section className={`blog-admin-page ${isVisible ? "fade-in" : ""}`}>
@@ -141,6 +148,16 @@ export default function AnalyticsPage() {
 
       <div className="blog-admin-analytics-cards">
         {(analyticsSummary?.analyticsCards || []).map((stat) => (
+          <div key={stat.label} className="blog-admin-analytics-stat">
+            <div className="as-label">{stat.label}</div>
+            <div className="as-val">{stat.value}</div>
+            <div className={`as-change ${stat.tone}`}>{stat.change}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="blog-admin-analytics-cards">
+        {behaviorCards.map((stat) => (
           <div key={stat.label} className="blog-admin-analytics-stat">
             <div className="as-label">{stat.label}</div>
             <div className="as-val">{stat.value}</div>
@@ -192,6 +209,186 @@ export default function AnalyticsPage() {
             {!isLoadingAnalytics && (analyticsSummary?.topPosts || []).length === 0 ? (
               <p className="blog-admin-empty-state">Top articles will appear once readers open your posts.</p>
             ) : null}
+          </div>
+        </div>
+      </div>
+
+      <div className="blog-admin-analytics-detail-grid">
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Top Pages</h3>
+              <p>Pages with the most views and unique visitor sessions.</p>
+            </div>
+          </div>
+
+          {topPages.length === 0 ? (
+            <p className="blog-admin-empty-state">Top pages will appear once visitors browse the site.</p>
+          ) : (
+            <div className="blog-admin-analytics-table-wrap">
+              <table className="blog-admin-analytics-table">
+                <thead>
+                  <tr>
+                    <th>Page</th>
+                    <th>Views</th>
+                    <th>Visitors</th>
+                    <th>Views / visitor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topPages.slice(0, 10).map((page) => (
+                    <tr key={page.path}>
+                      <td>
+                        <strong>{page.label}</strong>
+                        <span>{page.path}</span>
+                      </td>
+                      <td>{formatCompactNumber(page.views)}</td>
+                      <td>{formatCompactNumber(page.visitors)}</td>
+                      <td>{page.viewsPerVisitor}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Traffic Sources</h3>
+              <p>Where visitors came from before entering the site.</p>
+            </div>
+          </div>
+          <AnalyticsList items={trafficSources.slice(0, 8)} valueLabel="views" />
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Referrers</h3>
+              <p>External domains sending traffic to the website.</p>
+            </div>
+          </div>
+          <AnalyticsList
+            emptyLabel="No external referrers recorded yet."
+            items={referrers.slice(0, 8)}
+            valueLabel="views"
+          />
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Devices</h3>
+              <p>Breakdown of browsing sessions by device type.</p>
+            </div>
+          </div>
+          <AnalyticsList items={deviceBreakdown.slice(0, 6)} valueLabel="views" />
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Browsers And Systems</h3>
+              <p>Browser and operating system signals from anonymous sessions.</p>
+            </div>
+          </div>
+          <div className="blog-admin-analytics-split">
+            <AnalyticsList items={browserBreakdown.slice(0, 5)} valueLabel="views" />
+            <AnalyticsList items={osBreakdown.slice(0, 5)} valueLabel="views" />
+          </div>
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Locale Signals</h3>
+              <p>Language and timezone hints from visitor browsers.</p>
+            </div>
+          </div>
+          <div className="blog-admin-analytics-split">
+            <AnalyticsList items={languageBreakdown.slice(0, 5)} valueLabel="views" />
+            <AnalyticsList items={timezoneBreakdown.slice(0, 5)} valueLabel="views" />
+          </div>
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Engagement Depth</h3>
+              <p>How far visitors scroll and how long they stay active.</p>
+            </div>
+          </div>
+          <div className="blog-admin-analytics-split">
+            <AnalyticsList items={scrollDepth} valueLabel="events" />
+            <AnalyticsList items={engagementTime} valueLabel="events" />
+          </div>
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Outbound And Contact Clicks</h3>
+              <p>External sites, email links, and phone links visitors open.</p>
+            </div>
+          </div>
+          <AnalyticsList
+            emptyLabel="No outbound or contact clicks tracked yet."
+            items={topClickTargets.slice(0, 8)}
+            valueLabel="clicks"
+          />
+        </div>
+      </div>
+
+      <div className="blog-admin-analytics-row">
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>User Journeys</h3>
+              <p>Anonymous session paths ranked by activity and time spent.</p>
+            </div>
+          </div>
+
+          {topJourneys.length === 0 ? (
+            <p className="blog-admin-empty-state">Journey paths will appear after visitors browse more than one page or engage with content.</p>
+          ) : (
+            <div className="blog-admin-journey-list">
+              {topJourneys.map((journey) => (
+                <article key={journey.token} className="blog-admin-journey-row">
+                  <div>
+                    <strong>{journey.entryLabel}</strong>
+                    <span>to</span>
+                    <strong>{journey.exitLabel}</strong>
+                  </div>
+                  <small>
+                    {journey.pageViews} page view{journey.pageViews === 1 ? "" : "s"} ·{" "}
+                    {journey.events} events · {journey.durationLabel} ·{" "}
+                    {journey.source} · {journey.deviceType}
+                  </small>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="blog-admin-analytics-big-card">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Hourly Activity</h3>
+              <p>Page views by visitor local browser time.</p>
+            </div>
+          </div>
+          <div className="blog-admin-hourly-list">
+            {hourlyActivity.map((item) => (
+              <div key={item.hour} className="blog-admin-hourly-row">
+                <span>{item.label}</span>
+                <div>
+                  <i style={{ width: `${Math.max((item.count / hourlyMax) * 100, item.count ? 6 : 0)}%` }} />
+                </div>
+                <strong>{formatCompactNumber(item.count)}</strong>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -304,50 +501,6 @@ export default function AnalyticsPage() {
         </div>
 
         <div className="blog-admin-right-stack">
-          <div className="blog-admin-analytics-big-card">
-            <div className="blog-admin-panel-head">
-              <div>
-                <h3>Subscribers</h3>
-                <p>See who receives your blog broadcasts.</p>
-              </div>
-              <span className="blog-admin-pill-count">{subscribers.length}</span>
-            </div>
-
-            <input
-              className="blog-admin-form-input"
-              type="text"
-              value={subscriberQuery}
-              onChange={(event) => setSubscriberQuery(event.target.value)}
-              placeholder="Search by name or email"
-            />
-
-            {isLoadingSubscribers ? (
-              <p className="blog-admin-empty-state">Loading subscribers...</p>
-            ) : subscribersError ? (
-              <p className="blog-admin-empty-state">{subscribersError}</p>
-            ) : filteredSubscribers.length === 0 ? (
-              <p className="blog-admin-empty-state">No subscribers match your search.</p>
-            ) : (
-              <div className="blog-admin-subscriber-list">
-                {filteredSubscribers.map((subscriber) => (
-                  <article key={subscriber.id || subscriber.email} className="blog-admin-subscriber-card">
-                    <div>
-                      <strong>{subscriber.name}</strong>
-                      <a href={`mailto:${subscriber.email}`}>{subscriber.email}</a>
-                    </div>
-                    <span className={`blog-admin-chip ${subscriber.status === "active" ? "is-success" : ""}`}>
-                      {subscriber.status}
-                    </span>
-                    <small>
-                      Joined {formatSubscriberDate(subscriber.createdAt)} · Source{" "}
-                      {subscriber.source || "website"}
-                    </small>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-
           <div className="blog-admin-analytics-big-card">
             <div className="blog-admin-panel-head">
               <div>

@@ -1,4 +1,6 @@
 import Container from "./ui/Container";
+import { openCookiePreferences } from "../lib/cookieConsent";
+import { Link } from "react-router-dom";
 
 const footerEmails = [
   "ttdanielplus@gmail.com",
@@ -52,6 +54,23 @@ export default function Footer() {
                   {email}
                 </a>
               ))}
+            </div>
+            <div className="mt-5 flex justify-center">
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={openCookiePreferences}
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-white/20 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 transition hover:border-[#f1d49e]/60 hover:text-[#f1d49e]"
+                >
+                  Cookie settings
+                </button>
+                <Link
+                  to="/privacy-cookies"
+                  className="inline-flex h-10 items-center justify-center rounded-full border border-white/20 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80 transition hover:border-[#f1d49e]/60 hover:text-[#f1d49e]"
+                >
+                  Privacy and cookies
+                </Link>
+              </div>
             </div>
           </div>
 

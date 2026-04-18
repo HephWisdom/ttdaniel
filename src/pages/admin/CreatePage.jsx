@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CoverUpload from "../../components/admin/CoverUpload";
 import Editor from "../../components/admin/Editor";
@@ -7,9 +7,19 @@ import { PlusCircleIcon } from "../../components/admin/AdminIcons";
 import useAdminBlog from "../../components/admin/useAdminBlog";
 import { defaultCreateValues, initialCreateOptions } from "../../data/mockData";
 import useWordCount from "../../hooks/useWordCount";
-import { hasHtmlContent, sanitizeBlogHtml, toPlainBlogText } from "../../lib/blogContent";
-
-const DRAFT_STORAGE_KEY = "ttd_blog_admin_editor_draft_v1";
+import {
+  hasHtmlContent,
+  hasMeaningfulBlogContent,
+  sanitizeBlogHtml,
+  toPlainBlogText,
+} from "../../lib/blogContent";
+import {
+  deleteBlogDraft,
+  fetchBlogDraft,
+  isUsingSupabase,
+  saveBlogDraft,
+  uploadBlogImage,
+} from "../../lib/blogStore";
 
 function toDateTimeInputValue(value) {
   if (!value) return "";
@@ -187,6 +197,18 @@ function areTagListsEqual(listA = [], listB = []) {
   return listA.every((tag, index) => tag === listB[index]);
 }
 
+function hasMeaningfulDraftValue(values = {}) {
+  return Boolean(
+    String(values.title || "").trim() ||
+      String(values.excerpt || "").trim() ||
+      hasMeaningfulBlogContent(values.content || "") ||
+      String(values.image || "").trim() ||
+      String(values.author || "").trim() ||
+      String(values.publishAt || "").trim() ||
+      (Array.isArray(values.tags) && values.tags.some((tag) => String(tag || "").trim()))
+  );
+}
+
 function getSelectionElement(node) {
   if (!node) return null;
   return node.nodeType === 3 ? node.parentElement : node;
@@ -337,14 +359,13 @@ export default function CreatePage() {
   const [options, setOptions] = useState(initialCreateOptions);
   const [activeToolbarKeys, setActiveToolbarKeys] = useState([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [hydratedDraft, setHydratedDraft] = useState(false);
   const bodyInputRef = useRef(null);
   const normalizedBodyValue = useMemo(() => normalizeEditorValue(bodyValue), [bodyValue]);
   const wordCount = useWordCount(titleValue, toPlainBlogText(normalizedBodyValue));
 
-  const replaceBodyValue = (nextValue) => {
+  const replaceBodyValue = useCallback((nextValue) => {
     setBodyValue(normalizeEditorValue(nextValue));
-  };
+  }, []);
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -364,75 +385,94 @@ export default function CreatePage() {
     const targetPost = posts.find((post) => String(post.id) === String(editId));
     if (!targetPost) return;
 
-    clearFeedback();
-    setTitleValue(targetPost.title || "");
-    replaceBodyValue(targetPost.content || "");
-    setExcerptValue(targetPost.excerpt || "");
-    setAuthorValue(targetPost.author || defaultCreateValues.author);
-    setTagValues(normalizeTagList(targetPost.tags));
-    setPublishAtValue(toDateTimeInputValue(targetPost.createdAt));
-    setCoverPreview(targetPost.image || "");
-    setCoverFile(null);
-    setOptions((prev) => ({
-      ...prev,
-      allowComments:
-        typeof targetPost.allowComments === "boolean"
-          ? targetPost.allowComments
-          : prev.allowComments,
-      featuredArticle:
-        typeof targetPost.isFeatured === "boolean" ? targetPost.isFeatured : prev.featuredArticle,
-      notifySubscribers: false,
-      seoOptimized:
-        typeof targetPost.seoEnabled === "boolean" ? targetPost.seoEnabled : prev.seoOptimized,
-    }));
-    setHydratedDraft(true);
-  }, [clearFeedback, editId, posts]);
+    const frameId = window.requestAnimationFrame(() => {
+      clearFeedback();
+      setTitleValue(targetPost.title || "");
+      replaceBodyValue(targetPost.content || "");
+      setExcerptValue(targetPost.excerpt || "");
+      setAuthorValue(targetPost.author || defaultCreateValues.author);
+      setTagValues(normalizeTagList(targetPost.tags));
+      setPublishAtValue(toDateTimeInputValue(targetPost.createdAt));
+      setCoverPreview(targetPost.image || "");
+      setCoverFile(null);
+      setOptions((prev) => ({
+        ...prev,
+        allowComments:
+          typeof targetPost.allowComments === "boolean"
+            ? targetPost.allowComments
+            : prev.allowComments,
+        featuredArticle:
+          typeof targetPost.isFeatured === "boolean"
+            ? targetPost.isFeatured
+            : prev.featuredArticle,
+        notifySubscribers: false,
+        seoOptimized:
+          typeof targetPost.seoEnabled === "boolean" ? targetPost.seoEnabled : prev.seoOptimized,
+      }));
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [clearFeedback, editId, posts, replaceBodyValue]);
 
   useEffect(() => {
-    if (hydratedDraft || editId) return;
+    if (editId) return;
 
-    try {
-      const saved = window.localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (!saved) {
-        setHydratedDraft(true);
-        return;
-      }
+    let isActive = true;
 
-      const parsed = JSON.parse(saved);
-      if (parsed && typeof parsed === "object") {
-        setTitleValue(parsed.title || "");
-        replaceBodyValue(parsed.content || "");
-        setExcerptValue(parsed.excerpt || "");
-        setAuthorValue(parsed.author || defaultCreateValues.author);
-        setPublishAtValue(parsed.publishAt || "");
-        setTagValues(normalizeTagList(parsed.tags));
-        setCoverPreview(parsed.image || "");
+    const loadDraft = async () => {
+      try {
+        const draft = await fetchBlogDraft();
+        if (!isActive) return;
+
+        if (!draft) {
+          setTitleValue(defaultCreateValues.title);
+          replaceBodyValue(defaultCreateValues.content);
+          setExcerptValue(defaultCreateValues.excerpt);
+          setAuthorValue(defaultCreateValues.author);
+          setPublishAtValue(defaultCreateValues.publishAt);
+          setTagValues(normalizeTagList(defaultCreateValues.tags));
+          setTagInput("");
+          setCoverFile(null);
+          setCoverPreview(defaultCreateValues.image);
+          setOptions(initialCreateOptions);
+          return;
+        }
+
+        setTitleValue(draft.title || "");
+        replaceBodyValue(draft.content || "");
+        setExcerptValue(draft.excerpt || "");
+        setAuthorValue(draft.author || defaultCreateValues.author);
+        setPublishAtValue(toDateTimeInputValue(draft.publishAt));
+        setTagValues(normalizeTagList(draft.tags));
+        setTagInput("");
+        setCoverFile(null);
+        setCoverPreview(draft.image || "");
         setOptions((prev) => ({
           ...prev,
           allowComments:
-            typeof parsed.allowComments === "boolean"
-              ? parsed.allowComments
-              : prev.allowComments,
+            typeof draft.allowComments === "boolean" ? draft.allowComments : prev.allowComments,
           featuredArticle:
-            typeof parsed.featuredArticle === "boolean"
-              ? parsed.featuredArticle
-              : prev.featuredArticle,
-          notifySubscribers:
-            typeof parsed.notifySubscribers === "boolean"
-              ? parsed.notifySubscribers
-              : prev.notifySubscribers,
+            typeof draft.isFeatured === "boolean" ? draft.isFeatured : prev.featuredArticle,
+          notifySubscribers: false,
           seoOptimized:
-            typeof parsed.seoOptimized === "boolean"
-              ? parsed.seoOptimized
-              : prev.seoOptimized,
+            typeof draft.seoEnabled === "boolean" ? draft.seoEnabled : prev.seoOptimized,
         }));
+      } catch (error) {
+        if (!isActive) return;
+
+        setFeedbackNotice({
+          tone: "warning",
+          message: error.message || "Unable to load the shared draft.",
+        });
       }
-    } catch {
-      // Ignore invalid drafts.
-    } finally {
-      setHydratedDraft(true);
-    }
-  }, [editId, hydratedDraft]);
+    };
+
+    loadDraft();
+
+    return () => {
+      isActive = false;
+    };
+  }, [editId, replaceBodyValue, setFeedbackNotice]);
 
   const resetEditorState = () => {
     setTitleValue(defaultCreateValues.title);
@@ -447,7 +487,6 @@ export default function CreatePage() {
     setOptions(initialCreateOptions);
     setIsPreviewOpen(false);
     setActiveToolbarKeys([]);
-    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
   };
 
   useEffect(() => {
@@ -1083,7 +1122,8 @@ export default function CreatePage() {
     return nextTags;
   };
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
+    clearFeedback();
     const nextTags = commitPendingTag();
     const payload = {
       title: titleValue,
@@ -1099,11 +1139,39 @@ export default function CreatePage() {
       seoOptimized: options.seoOptimized,
     };
 
-    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(payload));
-    setFeedbackNotice({
-      tone: "success",
-      message: "Draft saved locally for this browser session.",
-    });
+    if (!hasMeaningfulDraftValue(payload)) {
+      setFeedbackNotice({
+        tone: "warning",
+        message: "Add a title, excerpt, content, image, tag, or schedule before saving a draft.",
+      });
+      return;
+    }
+
+    try {
+      let imageToSave = payload.image;
+      if (coverFile) {
+        imageToSave = await uploadBlogImage(coverFile);
+      }
+
+      const savedDraft = await saveBlogDraft({
+        ...payload,
+        image: imageToSave,
+      });
+
+      setCoverFile(null);
+      setCoverPreview(savedDraft?.image || imageToSave || "");
+      setFeedbackNotice({
+        tone: "success",
+        message: isUsingSupabase()
+          ? "Draft saved to shared admin storage with a local backup on this device."
+          : "Draft saved locally on this device.",
+      });
+    } catch (error) {
+      setFeedbackNotice({
+        tone: "warning",
+        message: error.message || "Unable to save the draft.",
+      });
+    }
   };
 
   const handlePublish = async () => {
@@ -1127,6 +1195,15 @@ export default function CreatePage() {
     });
 
     if (!savedPost) return;
+
+    try {
+      await deleteBlogDraft();
+    } catch (error) {
+      setFeedbackNotice({
+        tone: "warning",
+        message: error.message || "Post published, but the shared draft could not be cleared.",
+      });
+    }
 
     resetEditorState();
     setSearchParams({});

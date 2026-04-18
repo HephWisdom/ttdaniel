@@ -8,10 +8,12 @@ import {
   createBlogComment,
   fetchBlogLoveStats,
   fetchPublishedBlogPostById,
+  fetchPublishedBlogPosts,
   fetchCommentsByPostId,
   formatBlogDate,
   formatCommentDate,
   removeBlogLoveReaction,
+  sortBlogPosts,
 } from "../lib/blogStore";
 import { hasHtmlContent, sanitizeBlogHtml, toPlainBlogText } from "../lib/blogContent";
 import { trackBlogPostView } from "../lib/siteAnalytics";
@@ -184,9 +186,17 @@ function renderArticleBlocks(content = "", postId = "") {
   });
 }
 
+function buildSidebarExcerpt(post) {
+  const source = String(post?.excerpt || "").trim() || toPlainBlogText(post?.content || "");
+  if (!source) return "Read more from the blog and explore another message.";
+  if (source.length <= 110) return source;
+  return `${source.slice(0, 107).trimEnd()}...`;
+}
+
 export default function BlogDetails() {
   const { postId } = useParams();
   const [post, setPost] = useState(null);
+  const [relatedPosts, setRelatedPosts] = useState([]);
   const [comments, setComments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -237,9 +247,15 @@ export default function BlogDetails() {
       setError("");
 
       try {
-        const loadedPost = await fetchPublishedBlogPostById(postId);
+        const [loadedPost, publishedPosts] = await Promise.all([
+          fetchPublishedBlogPostById(postId),
+          fetchPublishedBlogPosts(),
+        ]);
         let loadedComments = [];
         let loadedLoveStats = { count: 0, hasReacted: false };
+        const nextRelatedPosts = sortBlogPosts(publishedPosts)
+          .filter((item) => String(item.id) !== String(postId))
+          .slice(0, 4);
 
         if (loadedPost) {
           const [commentsResult, loveStatsResult] = await Promise.allSettled([
@@ -258,6 +274,7 @@ export default function BlogDetails() {
 
         if (!isMounted) return;
         setPost(loadedPost);
+        setRelatedPosts(nextRelatedPosts);
         setComments(loadedComments);
         setLoveCount(loadedLoveStats.count);
         setHasLoved(loadedLoveStats.hasReacted);
@@ -528,6 +545,7 @@ export default function BlogDetails() {
   }
 
   const imageSrc = post.image || blogFallbackImage;
+  const [featuredRelatedPost, ...additionalRelatedPosts] = relatedPosts;
 
   return (
     <section className="relative overflow-hidden bg-[#f6f1e8] text-[#20170f]">
@@ -676,6 +694,82 @@ export default function BlogDetails() {
                 >
                   Download Image
                 </button>
+
+                {featuredRelatedPost ? (
+                  <div className="mt-4 rounded-[16px] border border-[#e0cfb3] bg-[#fffdf8] p-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3f]">
+                      Popular Blog
+                    </p>
+                    <Link
+                      to={`/blog/${featuredRelatedPost.id}`}
+                      className="mt-3 block overflow-hidden rounded-[12px] border border-[#eadcc5] bg-[#f5ebd9] transition hover:shadow-[0_14px_30px_-18px_rgba(0,0,0,0.35)]"
+                    >
+                      <img
+                        src={featuredRelatedPost.image || blogFallbackImage}
+                        alt={featuredRelatedPost.title}
+                        onError={(event) => {
+                          event.currentTarget.src = blogFallbackImage;
+                        }}
+                        className="h-[180px] w-full object-cover"
+                        loading="lazy"
+                      />
+                    </Link>
+                    <div className="mt-3">
+                      <h3 className="font-serif text-[1.05rem] leading-snug text-[#24190f]">
+                        {featuredRelatedPost.title}
+                      </h3>
+                      <p className="mt-2 text-sm leading-relaxed text-[#5d4b36]">
+                        {buildSidebarExcerpt(featuredRelatedPost)}
+                      </p>
+                      <Link
+                        to={`/blog/${featuredRelatedPost.id}`}
+                        className="mt-3 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5a4020] underline decoration-[#5a4020]/35 underline-offset-4 transition hover:text-[#24190f] hover:decoration-[#24190f]"
+                      >
+                        Read More And Explore
+                        <span aria-hidden="true">→</span>
+                      </Link>
+                    </div>
+
+                    {additionalRelatedPosts.length ? (
+                      <div className="mt-4 border-t border-[#eadcc5] pt-4">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#8a6a3f]">
+                          More To Explore
+                        </p>
+                        <div className="mt-3 space-y-3">
+                          {additionalRelatedPosts.map((relatedPost) => (
+                            <Link
+                              key={relatedPost.id}
+                              to={`/blog/${relatedPost.id}`}
+                              className="flex items-start gap-3 rounded-[14px] border border-[#eadcc5] bg-[#fff8ee] p-2.5 transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_-20px_rgba(0,0,0,0.35)]"
+                            >
+                              <img
+                                src={relatedPost.image || blogFallbackImage}
+                                alt={relatedPost.title}
+                                onError={(event) => {
+                                  event.currentTarget.src = blogFallbackImage;
+                                }}
+                                className="h-20 w-20 flex-none rounded-[10px] object-cover"
+                                loading="lazy"
+                              />
+                              <div className="min-w-0">
+                                <h4 className="line-clamp-2 text-sm font-semibold leading-snug text-[#24190f]">
+                                  {relatedPost.title}
+                                </h4>
+                                <p className="mt-1 line-clamp-3 text-xs leading-relaxed text-[#5d4b36]">
+                                  {buildSidebarExcerpt(relatedPost)}
+                                </p>
+                                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5a4020]">
+                                  Read Blog
+                                  <span aria-hidden="true">→</span>
+                                </span>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </aside>
           </div>

@@ -7,10 +7,16 @@ import {
   ImageIcon,
   LinkIcon,
   OrderedListIcon,
+  PreviewIcon,
+  PublishIcon,
   QuoteIcon,
   RedoIcon,
+  SaveIcon,
   UndoIcon,
 } from "./AdminIcons";
+
+const editorBodyHintId = "blog-admin-editor-body-hint";
+const editorBodyPlaceholder = "Start writing your story...";
 
 const toolbarButtons = [
   { key: "bold", label: <b>B</b>, title: "Bold", type: "text" },
@@ -95,69 +101,106 @@ export default function Editor({
             </button>
           );
         })}
-      </div>
-      <p className="blog-admin-editor-toolbar-hint">
-        Highlight text and choose a style. Links and images are added visually, so writers never
-        have to touch HTML tags.
-      </p>
 
-      <textarea
-        className="blog-admin-editor-title-input"
-        rows={2}
-        value={titleValue}
-        onChange={onTitleChange}
-        placeholder="Article title goes here…"
-      />
+        <div className="blog-admin-editor-toolbar-spacer" />
 
-      {isPreviewOpen ? (
-        <div className="blog-admin-editor-preview">
-          <h2>{previewTitle || "Live preview"}</h2>
-          {previewHtml ? (
-            <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
-          ) : (
-            <p>Start writing your story to preview it here.</p>
-          )}
+        <div className="blog-admin-editor-toolbar-actions">
+          <button
+            type="button"
+            title="Save Draft"
+            aria-label="Save Draft"
+            className="blog-admin-toolbar-action-btn"
+            onClick={onSaveDraft}
+          >
+            <SaveIcon />
+            <span>Save</span>
+          </button>
+          <button
+            type="button"
+            title={isPreviewOpen ? "Edit Content" : "Preview"}
+            aria-label={isPreviewOpen ? "Edit Content" : "Preview"}
+            aria-pressed={isPreviewOpen}
+            className={`blog-admin-toolbar-action-btn ${isPreviewOpen ? "active" : ""}`}
+            onClick={onPreviewToggle}
+          >
+            <PreviewIcon />
+            <span>{isPreviewOpen ? "Edit" : "Preview"}</span>
+          </button>
+          <button
+            type="button"
+            title={isPublishing ? "Publishing..." : "Publish Article"}
+            aria-label={isPublishing ? "Publishing..." : "Publish Article"}
+            className="blog-admin-toolbar-action-btn is-primary"
+            onClick={onPublish}
+            disabled={isPublishing}
+          >
+            <PublishIcon />
+            <span>{isPublishing ? "Publishing..." : "Publish"}</span>
+          </button>
         </div>
-      ) : (
-        <div
-          ref={bodyInputRef}
-          className={`blog-admin-editor-body-input blog-admin-editor-surface ${
-            isEditorEmpty ? "is-empty" : ""
-          }`}
-          contentEditable
-          suppressContentEditableWarning
-          role="textbox"
-          aria-multiline="true"
-          spellCheck
-          data-placeholder="Start writing your story… Select words to make them bold, add headings, insert links, and keep everything readable without code."
-          onInput={onBodyChange}
-          onBlur={onBodyBlur}
-          onPaste={onBodyPaste}
-          onKeyDown={onBodyKeyDown}
-        />
-      )}
+      </div>
+
+      <div className="blog-admin-editor-scroll-region">
+        <p id={editorBodyHintId} className="blog-admin-editor-toolbar-hint">
+          Highlight text and choose a style. Links and images are added visually, so writers never
+          have to touch HTML tags.
+        </p>
+
+        {!isPreviewOpen ? (
+          <textarea
+            className="blog-admin-editor-title-input"
+            rows={2}
+            value={titleValue}
+            onChange={onTitleChange}
+            placeholder="Article title goes here…"
+          />
+        ) : null}
+
+        {isPreviewOpen ? (
+          <article className="blog-admin-editor-preview" aria-live="polite">
+            <p className="blog-admin-editor-preview-label">Article Preview</p>
+            <h1>{previewTitle || "Live preview"}</h1>
+            {previewHtml ? (
+              <section
+                className="blog-admin-editor-preview-body"
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
+              />
+            ) : (
+              <p>Start writing your story to preview it here.</p>
+            )}
+          </article>
+        ) : (
+          <div className="blog-admin-editor-body-shell">
+            {isEditorEmpty ? (
+              <span className="blog-admin-editor-placeholder" aria-hidden="true">
+                {editorBodyPlaceholder}
+              </span>
+            ) : null}
+
+            <div
+              ref={bodyInputRef}
+              className="blog-admin-editor-body-input blog-admin-editor-surface"
+              contentEditable
+              suppressContentEditableWarning
+              role="textbox"
+              aria-label="Article content"
+              aria-placeholder={editorBodyPlaceholder}
+              aria-describedby={editorBodyHintId}
+              aria-multiline="true"
+              spellCheck
+              onInput={onBodyChange}
+              onBlur={onBodyBlur}
+              onPaste={onBodyPaste}
+              onKeyDown={onBodyKeyDown}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="blog-admin-editor-footer">
         <span className="blog-admin-word-count">
           {wordCount} word{wordCount === 1 ? "" : "s"}
         </span>
-
-        <div className="blog-admin-editor-actions">
-          <button type="button" className="blog-admin-btn-outline" onClick={onSaveDraft}>
-            Save Draft
-          </button>
-          <button type="button" className="blog-admin-btn-outline" onClick={onPreviewToggle}>
-            {isPreviewOpen ? "Edit Content" : "Preview"}
-          </button>
-          <button
-            type="button"
-            className="blog-admin-btn-primary"
-            onClick={onPublish}
-            disabled={isPublishing}
-          >
-            {isPublishing ? "Publishing..." : "Publish Article →"}
-          </button>
-        </div>
       </div>
     </div>
   );
