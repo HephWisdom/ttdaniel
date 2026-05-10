@@ -28,9 +28,26 @@ export default function ArticleCard({
   likes = 0,
   comments = 0,
   tag = "",
+  onEdit,
 }) {
+  const isInteractive = typeof onEdit === "function";
+
   return (
-    <article className="blog-admin-article-card">
+    <article
+      className={`blog-admin-article-card ${isInteractive ? "is-interactive" : ""}`}
+      role={isInteractive ? "button" : undefined}
+      tabIndex={isInteractive ? 0 : undefined}
+      onClick={isInteractive ? onEdit : undefined}
+      onKeyDown={
+        isInteractive
+          ? (event) => {
+              if (event.key !== "Enter" && event.key !== " ") return;
+              event.preventDefault();
+              onEdit();
+            }
+          : undefined
+      }
+    >
       <div className="blog-admin-article-images blog-admin-article-images-live">
         <img
           src={image || blogFallbackImage}
@@ -62,6 +79,19 @@ export default function ArticleCard({
             <span className="blog-admin-article-metric">{formatCompactNumber(comments)} comments</span>
             <span className="blog-admin-article-responses">{formatCompactNumber(views)} views</span>
           </div>
+
+          {isInteractive ? (
+            <button
+              type="button"
+              className="blog-admin-btn-outline blog-admin-btn-small"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit();
+              }}
+            >
+              Edit
+            </button>
+          ) : null}
         </div>
       </div>
     </article>

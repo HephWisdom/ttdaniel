@@ -1029,6 +1029,7 @@ export async function updateBlogPost(postId, input) {
   }
 
   const publishAtIso = toPublishAtIso(input.publishAt);
+  const existingCreatedAt = String(input.createdAt || "").trim();
   const payload = {
     title: input.title.trim(),
     image: input.image?.trim() || "",
@@ -1036,7 +1037,7 @@ export async function updateBlogPost(postId, input) {
     content: input.content.trim(),
     author: input.author?.trim() || "Admin",
     tags: Array.isArray(input.tags) ? input.tags : [],
-    created_at: publishAtIso || new Date().toISOString(),
+    created_at: publishAtIso || existingCreatedAt || new Date().toISOString(),
     allow_comments: input.allowComments !== false,
     is_featured: input.isFeatured === true,
     seo_enabled: input.seoEnabled !== false,

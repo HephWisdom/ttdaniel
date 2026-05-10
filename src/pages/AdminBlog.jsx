@@ -424,10 +424,15 @@ export default function AdminBlog() {
 
   const savePost = useCallback(
     async ({ editingPostId, values, imageFile }) => {
+      const wasEditing = Boolean(editingPostId);
       clearFeedback();
 
       if (!isVerified) {
-        setFeedbackError("Verify admin access before publishing.");
+        setFeedbackError(
+          wasEditing
+            ? "Verify admin access before updating the article."
+            : "Verify admin access before publishing."
+        );
         return null;
       }
 
@@ -443,7 +448,6 @@ export default function AdminBlog() {
       setIsPublishing(true);
 
       try {
-        const wasEditing = Boolean(editingPostId);
         let imageToSave = values.image || "";
         if (imageFile) {
           imageToSave = await uploadBlogImage(imageFile);
@@ -534,7 +538,7 @@ export default function AdminBlog() {
           return savedPost;
         }
       } catch (error) {
-        setFeedbackError(error.message || "Unable to publish post.");
+        setFeedbackError(error.message || (wasEditing ? "Unable to update post." : "Unable to publish post."));
         return null;
       } finally {
         setIsPublishing(false);

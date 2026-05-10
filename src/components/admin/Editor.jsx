@@ -60,6 +60,8 @@ export default function Editor({
   previewHtml,
   onPublish,
   isPublishing,
+  publishLabel = "Publish",
+  publishingLabel = "Publishing...",
 }) {
   useEffect(() => {
     const editor = bodyInputRef.current;
@@ -128,14 +130,14 @@ export default function Editor({
           </button>
           <button
             type="button"
-            title={isPublishing ? "Publishing..." : "Publish Article"}
-            aria-label={isPublishing ? "Publishing..." : "Publish Article"}
+            title={isPublishing ? publishingLabel : `${publishLabel} Article`}
+            aria-label={isPublishing ? publishingLabel : `${publishLabel} Article`}
             className="blog-admin-toolbar-action-btn is-primary"
             onClick={onPublish}
             disabled={isPublishing}
           >
             <PublishIcon />
-            <span>{isPublishing ? "Publishing..." : "Publish"}</span>
+            <span>{isPublishing ? publishingLabel : publishLabel}</span>
           </button>
         </div>
       </div>

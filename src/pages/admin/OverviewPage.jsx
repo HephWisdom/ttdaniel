@@ -37,6 +37,7 @@ export default function OverviewPage() {
     likes: post.likes || 0,
     comments: post.comments || 0,
     tag: Array.isArray(post.tags) && post.tags.length > 0 ? post.tags[0] : "",
+    onEdit: () => navigate(`/admin/blog/create?edit=${post.id}`),
   }));
 
   return (

@@ -16,6 +16,7 @@ import {
 import {
   deleteBlogDraft,
   fetchBlogDraft,
+  fetchBlogPostById,
   isUsingSupabase,
   saveBlogDraft,
   uploadBlogImage,
@@ -359,13 +360,52 @@ export default function CreatePage() {
   const [options, setOptions] = useState(initialCreateOptions);
   const [activeToolbarKeys, setActiveToolbarKeys] = useState([]);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [remoteEditPost, setRemoteEditPost] = useState(null);
+  const [isLoadingEditPost, setIsLoadingEditPost] = useState(false);
   const bodyInputRef = useRef(null);
+  const initializedEditSourceRef = useRef("");
   const normalizedBodyValue = useMemo(() => normalizeEditorValue(bodyValue), [bodyValue]);
   const wordCount = useWordCount(titleValue, toPlainBlogText(normalizedBodyValue));
+  const isEditing = Boolean(editId);
+  const editingPost = useMemo(() => {
+    if (!editId) return null;
+    return posts.find((post) => String(post.id) === String(editId)) || remoteEditPost;
+  }, [editId, posts, remoteEditPost]);
+  const isMissingEditPost = isEditing && !isLoadingEditPost && !editingPost;
 
   const replaceBodyValue = useCallback((nextValue) => {
     setBodyValue(normalizeEditorValue(nextValue));
   }, []);
+
+  const applyPostToEditor = useCallback(
+    (post) => {
+      if (!post) return;
+
+      clearFeedback();
+      setTitleValue(post.title || "");
+      replaceBodyValue(post.content || "");
+      setExcerptValue(post.excerpt || "");
+      setAuthorValue(post.author || defaultCreateValues.author);
+      setPublishAtValue(toDateTimeInputValue(post.createdAt));
+      setTagValues(normalizeTagList(post.tags));
+      setTagInput("");
+      setCoverFile(null);
+      setCoverPreview(post.image || "");
+      setOptions((prev) => ({
+        ...prev,
+        allowComments:
+          typeof post.allowComments === "boolean" ? post.allowComments : prev.allowComments,
+        featuredArticle:
+          typeof post.isFeatured === "boolean" ? post.isFeatured : prev.featuredArticle,
+        notifySubscribers: false,
+        seoOptimized:
+          typeof post.seoEnabled === "boolean" ? post.seoEnabled : prev.seoOptimized,
+      }));
+      setIsPreviewOpen(false);
+      setActiveToolbarKeys([]);
+    },
+    [clearFeedback, replaceBodyValue]
+  );
 
   useEffect(() => {
     const frameId = window.requestAnimationFrame(() => {
@@ -381,38 +421,62 @@ export default function CreatePage() {
   }, [coverPreview]);
 
   useEffect(() => {
-    if (!editId) return;
-    const targetPost = posts.find((post) => String(post.id) === String(editId));
-    if (!targetPost) return;
+    if (!editId) {
+      setRemoteEditPost(null);
+      setIsLoadingEditPost(false);
+      initializedEditSourceRef.current = "";
+      return;
+    }
+
+    const localMatch = posts.find((post) => String(post.id) === String(editId));
+    if (localMatch) {
+      setRemoteEditPost(localMatch);
+      setIsLoadingEditPost(false);
+      return;
+    }
+
+    let isActive = true;
+    setIsLoadingEditPost(true);
+
+    const loadEditPost = async () => {
+      try {
+        const post = await fetchBlogPostById(editId);
+        if (!isActive) return;
+        setRemoteEditPost(post);
+      } catch (error) {
+        if (!isActive) return;
+        setRemoteEditPost(null);
+        setFeedbackNotice({
+          tone: "warning",
+          message: error.message || "Unable to load the selected article for editing.",
+        });
+      } finally {
+        if (isActive) {
+          setIsLoadingEditPost(false);
+        }
+      }
+    };
+
+    loadEditPost();
+
+    return () => {
+      isActive = false;
+    };
+  }, [editId, posts, setFeedbackNotice]);
+
+  useEffect(() => {
+    if (!isEditing || !editingPost) return;
+
+    const sourceKey = `${editId}:${editingPost.createdAt || ""}:${editingPost.title || ""}`;
+    if (initializedEditSourceRef.current === sourceKey) return;
+    initializedEditSourceRef.current = sourceKey;
 
     const frameId = window.requestAnimationFrame(() => {
-      clearFeedback();
-      setTitleValue(targetPost.title || "");
-      replaceBodyValue(targetPost.content || "");
-      setExcerptValue(targetPost.excerpt || "");
-      setAuthorValue(targetPost.author || defaultCreateValues.author);
-      setTagValues(normalizeTagList(targetPost.tags));
-      setPublishAtValue(toDateTimeInputValue(targetPost.createdAt));
-      setCoverPreview(targetPost.image || "");
-      setCoverFile(null);
-      setOptions((prev) => ({
-        ...prev,
-        allowComments:
-          typeof targetPost.allowComments === "boolean"
-            ? targetPost.allowComments
-            : prev.allowComments,
-        featuredArticle:
-          typeof targetPost.isFeatured === "boolean"
-            ? targetPost.isFeatured
-            : prev.featuredArticle,
-        notifySubscribers: false,
-        seoOptimized:
-          typeof targetPost.seoEnabled === "boolean" ? targetPost.seoEnabled : prev.seoOptimized,
-      }));
+      applyPostToEditor(editingPost);
     });
 
     return () => window.cancelAnimationFrame(frameId);
-  }, [clearFeedback, editId, posts, replaceBodyValue]);
+  }, [applyPostToEditor, editId, editingPost, isEditing]);
 
   useEffect(() => {
     if (editId) return;
@@ -1190,19 +1254,27 @@ export default function CreatePage() {
         notifySubscribers: options.notifySubscribers,
         image: coverPreview,
         seoOptimized: options.seoOptimized,
+        createdAt: editingPost?.createdAt || "",
       },
       imageFile: coverFile,
     });
 
     if (!savedPost) return;
 
-    try {
-      await deleteBlogDraft();
-    } catch (error) {
-      setFeedbackNotice({
-        tone: "warning",
-        message: error.message || "Post published, but the shared draft could not be cleared.",
-      });
+    if (!isEditing) {
+      try {
+        await deleteBlogDraft();
+      } catch (error) {
+        setFeedbackNotice({
+          tone: "warning",
+          message: error.message || "Post published, but the shared draft could not be cleared.",
+        });
+      }
+    }
+
+    if (isEditing) {
+      navigate("/admin/blog/analytics", { replace: true });
+      return;
     }
 
     resetEditorState();
@@ -1210,20 +1282,99 @@ export default function CreatePage() {
     navigate("/admin/blog/create", { replace: true });
   };
 
+  if (isEditing && isLoadingEditPost && !editingPost) {
+    return (
+      <section className={`blog-admin-page ${isVisible ? "fade-in" : ""}`}>
+        <div className="blog-admin-overview-header blog-admin-create-header">
+          <div>
+            <h1>Edit Article</h1>
+            <p>Loading the published article for editing.</p>
+          </div>
+
+          <button
+            type="button"
+            className="blog-admin-btn-outline"
+            onClick={() => navigate("/admin/blog/analytics")}
+          >
+            Back to Analytics
+          </button>
+        </div>
+
+        <div className="blog-admin-panel">
+          <p className="blog-admin-empty-state">Loading the selected article...</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (isMissingEditPost) {
+    return (
+      <section className={`blog-admin-page ${isVisible ? "fade-in" : ""}`}>
+        <div className="blog-admin-overview-header blog-admin-create-header">
+          <div>
+            <h1>Edit Article</h1>
+            <p>The selected published article could not be found.</p>
+          </div>
+
+          <button
+            type="button"
+            className="blog-admin-btn-outline"
+            onClick={() => navigate("/admin/blog/analytics")}
+          >
+            Back to Analytics
+          </button>
+        </div>
+
+        <div className="blog-admin-panel blog-admin-drafts-empty-panel">
+          <div className="blog-admin-panel-head">
+            <div>
+              <h3>Article not found</h3>
+              <p>The post may have been deleted or the edit link is no longer valid.</p>
+            </div>
+          </div>
+
+          <div className="blog-admin-manage-post-actions">
+            <button
+              type="button"
+              className="blog-admin-btn-primary"
+              onClick={() => navigate("/admin/blog/analytics")}
+            >
+              View Published Posts
+            </button>
+            <button
+              type="button"
+              className="blog-admin-btn-outline"
+              onClick={() => {
+                setSearchParams({});
+                navigate("/admin/blog/create", { replace: true });
+              }}
+            >
+              Start New Article
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={`blog-admin-page ${isVisible ? "fade-in" : ""}`}>
       <div className="blog-admin-overview-header blog-admin-create-header">
         <div>
-          <h1>{editId ? "Edit Article" : "New Article"}</h1>
-          <p>Write, format, and publish your next story</p>
+          <h1>{isEditing ? "Edit Article" : "New Article"}</h1>
+          <p>
+            {isEditing
+              ? "Update the published article and save the changes live."
+              : "Write, format, and publish your next story"}
+          </p>
         </div>
 
         <button
           type="button"
           className="blog-admin-btn-outline"
-          onClick={() => navigate("/admin/blog")}
+          onClick={() => navigate(isEditing ? "/admin/blog/analytics" : "/admin/blog")}
         >
-          ← Back to Overview
+          {isEditing ? "Back to Analytics" : "← Back to Overview"}
         </button>
       </div>
 
@@ -1274,6 +1425,8 @@ export default function CreatePage() {
             previewHtml={normalizedBodyValue}
             onPublish={handlePublish}
             isPublishing={isPublishing}
+            publishLabel={isEditing ? "Update" : "Publish"}
+            publishingLabel={isEditing ? "Updating..." : "Publishing..."}
           />
         </div>
 

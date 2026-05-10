@@ -7,6 +7,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import Hero from "./components/Hero";
 import Interlude from "./components/Interlude";
 import Books from "./components/Books";
+import { BookTestimonials } from "./components/Testimonials";
 import Events from "./components/Events";
 import Counselling from "./components/Counselling";
 import BibleStudies from "./components/BibleStudies";
@@ -29,10 +30,11 @@ function Home() {
       <Hero />
       <Interlude />
       <Books />
+      <BookTestimonials />
       <Events />
       <BibleStudies />
       <Counselling />
-      <Blog_post/>
+      <Blog_post />
     </main>
   );
 }
