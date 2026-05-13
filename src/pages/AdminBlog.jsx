@@ -83,11 +83,12 @@ function AdminAuthGate({
       <form className="blog-admin-auth-card" onSubmit={onSubmit}>
         <p className="blog-admin-auth-label">Protected Access</p>
         <h1>{requiresSupabaseAuth ? "Sign In" : "Local Admin"}</h1>
-        <p>
-          {requiresSupabaseAuth
-            ? "Use your Supabase admin account to manage posts, subscribers, and comment moderation."
-            : "Supabase is not configured, so this session can still manage posts locally for development work."}
-        </p>
+        {!requiresSupabaseAuth ? (
+          <p>
+            Supabase is not configured, so this session can still manage posts locally for
+            development work.
+          </p>
+        ) : null}
 
         {requiresSupabaseAuth ? (
           <>
@@ -126,8 +127,8 @@ function AdminAuthGate({
         >
           {requiresSupabaseAuth
             ? isAuthSubmitting
-              ? "Signing In..."
-              : "Sign In & Continue"
+              ? "Logging in..."
+              : "Login"
             : "Unlock Local Admin"}
         </button>
 

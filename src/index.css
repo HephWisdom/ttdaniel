@@ -462,6 +462,10 @@ body {
   gap: 20px;
 }
 
+.blog-admin-auth-action {
+  min-height: 38px;
+}
+
 .blog-admin-topbar-icon {
   width: 38px;
   height: 38px;
@@ -2528,6 +2532,11 @@ body {
     gap: 10px;
   }
 
+  .blog-admin-auth-action {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
   .blog-admin-avatar-meta {
     display: none;
   }
@@ -2640,6 +2649,12 @@ body {
 
   .blog-admin-topbar-right {
     gap: 4px;
+  }
+
+  .blog-admin-auth-action {
+    padding-left: 12px;
+    padding-right: 12px;
+    font-size: 12px;
   }
 
   .blog-admin-topbar-icon {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Container from "./ui/Container";
 import MotionReveal from "./ui/MotionReveal";
+import SlideArrowButton from "./ui/SlideArrowButton";
 import { books, booksFallbackImage } from "../data/books";
 import {
   buildCurrentPagePath,
@@ -18,6 +19,7 @@ import {
 
 const STRIPE_PUBLISHABLE_KEY = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || "";
 const REGION_PREVIEW_STORAGE_KEY = "tt_daniel_books_region_preview";
+const SCROLL_EDGE_TOLERANCE = 12;
 let stripeClientPromise = null;
 
 function formatTitle(title = "") {
@@ -144,6 +146,7 @@ export default function Books() {
   const location = useLocation();
   const checkoutContainerRef = useRef(null);
   const embeddedCheckoutRef = useRef(null);
+  const booksTrackRef = useRef(null);
   const isLocalPreviewHost = useMemo(() => isLocalDevelopmentHost(), []);
   const detectedAfricaUser = useMemo(() => detectAfricaTimezone(), []);
   const [regionPreviewMode, setRegionPreviewMode] = useState(() =>
@@ -163,6 +166,9 @@ export default function Books() {
   const [isPreparingCheckout, setIsPreparingCheckout] = useState(false);
   const [checkoutSessionId, setCheckoutSessionId] = useState("");
   const [sessionStatus, setSessionStatus] = useState(null);
+  const [showAllBooks, setShowAllBooks] = useState(false);
+  const [canScrollBooksLeft, setCanScrollBooksLeft] = useState(false);
+  const [canScrollBooksRight, setCanScrollBooksRight] = useState(false);
 
   const bookMap = useMemo(() => {
     return new Map(books.filter((book) => book.id).map((book) => [book.id, book]));
@@ -288,6 +294,44 @@ export default function Books() {
       destroyEmbeddedCheckout();
     };
   }, [destroyEmbeddedCheckout]);
+
+  useEffect(() => {
+    if (showAllBooks) {
+      return undefined;
+    }
+
+    const track = booksTrackRef.current;
+
+    if (!track) {
+      return undefined;
+    }
+
+    const syncScrollState = () => {
+      const maxScrollLeft = Math.max(track.scrollWidth - track.clientWidth, 0);
+
+      setCanScrollBooksLeft(track.scrollLeft > SCROLL_EDGE_TOLERANCE);
+      setCanScrollBooksRight(track.scrollLeft < maxScrollLeft - SCROLL_EDGE_TOLERANCE);
+    };
+
+    const frameId = window.requestAnimationFrame(syncScrollState);
+    track.addEventListener("scroll", syncScrollState, { passive: true });
+
+    let resizeObserver;
+
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(syncScrollState);
+      resizeObserver.observe(track);
+    }
+
+    window.addEventListener("resize", syncScrollState);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      track.removeEventListener("scroll", syncScrollState);
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", syncScrollState);
+    };
+  }, [showAllBooks]);
 
   useEffect(() => {
     if (!cartToast) return undefined;
@@ -451,6 +495,158 @@ export default function Books() {
     setCartError("");
   };
 
+  const scrollBooks = (direction) => {
+    const track = booksTrackRef.current;
+
+    if (!track) {
+      return;
+    }
+
+    track.scrollBy({
+      left: direction * Math.max(track.clientWidth * 0.86, 220),
+      behavior: "smooth",
+    });
+  };
+
+  const renderBookCard = (pkg, idx) => {
+    const isFeatured =
+      idx === 0 && pkg.title === "ACCESS PORTALS FOR SUPERNATURAL BREAKTHROUGHS";
+    const isInCart = isDirectEbookAvailable(pkg) && cartBookIds.includes(pkg.id);
+    const africaEbookLink = pkg.paystackLink || null;
+    const ebookAvailable = isAfricaUser
+      ? Boolean(africaEbookLink)
+      : isDirectEbookAvailable(pkg);
+    const priceTag = getDisplayPrice(pkg, isAfricaUser);
+
+    return (
+      <MotionReveal
+        key={pkg.id || pkg.title + idx}
+        as="article"
+        delay={80 + idx * 80}
+        distance={30}
+        className={`group relative flex flex-col overflow-hidden rounded-[26px] border bg-gradient-to-b from-[#fbf8f2] to-[#efe4cf] transition-all duration-500 hover:-translate-y-1.5 ${
+          showAllBooks
+            ? "mx-auto w-full max-w-[340px]"
+            : "w-[292px] shrink-0 snap-start sm:w-[320px]"
+        } ${
+          isFeatured
+            ? "border-[#aa8852]/80 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.42)]"
+            : "border-[#cab28a]/70 shadow-[0_22px_56px_-36px_rgba(0,0,0,0.34)] hover:border-[#b79862]/70 hover:shadow-[0_32px_86px_-36px_rgba(0,0,0,0.45)]"
+        }`}
+        style={isFeatured ? { animation: "featuredGlow 2.8s ease-in-out infinite" } : undefined}
+      >
+        <div className="relative aspect-[4/5] overflow-hidden">
+          {isFeatured ? (
+            <span className="absolute right-[-50px] top-5 z-20 w-[190px] rotate-45 border-y border-[#f3deab] bg-[#8f1e1c] py-1 text-center text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#fff5da] shadow-[0_8px_22px_rgba(0,0,0,0.35)]">
+              New Release
+            </span>
+          ) : null}
+          <img
+            src={pkg.image}
+            alt={formatTitle(pkg.title)}
+            onError={(event) => {
+              event.currentTarget.src = booksFallbackImage;
+            }}
+            className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.05]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
+          <span className="absolute left-4 top-4 inline-flex items-center rounded-full border border-[#f0d7a7]/60 bg-[#20170d]/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#f3d9a2] backdrop-blur-sm">
+            {priceTag}
+          </span>
+          {isAfricaUser ? (
+            ebookAvailable ? (
+              <a
+                href={africaEbookLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${formatTitle(pkg.title)} E-book`}
+                className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#f0d7a7]/70 bg-[#20170d]/80 text-[#f3d9a2] backdrop-blur-sm transition hover:border-[#fff1c8] hover:bg-[#f5ead2] hover:text-[#231a11]"
+              >
+                <PlusIcon className="h-5 w-5" />
+              </a>
+            ) : (
+              <span className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#d8c39d]/60 bg-[#e8dcc8]/90 text-[#7a6a55] backdrop-blur-sm">
+                <PlusIcon className="h-5 w-5" />
+              </span>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={() => addToCart(pkg, { openCart: false })}
+              disabled={!ebookAvailable}
+              aria-label={`${isInCart ? "Already in cart:" : "Add"} ${formatTitle(pkg.title)} e-book`}
+              className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#f0d7a7]/70 bg-[#20170d]/80 text-[#f3d9a2] backdrop-blur-sm transition hover:border-[#fff1c8] hover:bg-[#f5ead2] hover:text-[#231a11] disabled:cursor-not-allowed disabled:border-[#d8c39d]/60 disabled:bg-[#e8dcc8]/90 disabled:text-[#7a6a55]"
+            >
+              <PlusIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-1 flex-col p-5">
+          <h3 className="whitespace-pre-line text-[15px] font-bold uppercase tracking-[0.02em] text-[#231a11]">
+            {pkg.title}
+          </h3>
+          <p className="mt-2 text-xs leading-relaxed text-[#5d4e3d]">
+            {pkg.blurb ||
+              "A timeless and practical guide. Add this title to your personal library."}{" "}
+            <button
+              type="button"
+              onClick={() => setActiveBook(pkg)}
+              className="inline font-semibold text-[#8f6b32] underline decoration-[#8f6b32]/60 underline-offset-2 transition hover:text-[#3a2b15] hover:decoration-[#3a2b15]"
+            >
+              Read more
+            </button>
+          </p>
+
+          <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
+            {pkg.amazon ? (
+              <a
+                href={pkg.amazon}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`${formatTitle(pkg.title)} Amazon`}
+                className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-transparent text-sm font-semibold uppercase tracking-[0.12em] text-[#22180f] transition hover:bg-[#22180f] hover:text-[#f7e9cc]"
+              >
+                Amazon
+              </a>
+            ) : (
+              <span className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-sm font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
+                Direct
+              </span>
+            )}
+
+            {isAfricaUser ? (
+              ebookAvailable ? (
+                <a
+                  href={africaEbookLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${formatTitle(pkg.title)} E-book`}
+                  className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11]"
+                >
+                  E-book
+                </a>
+              ) : (
+                <span className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-sm font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
+                  Coming soon
+                </span>
+              )
+            ) : (
+              <button
+                type="button"
+                onClick={() => addToCart(pkg)}
+                disabled={!ebookAvailable}
+                className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11] disabled:cursor-not-allowed disabled:border-[#bfa785]/55 disabled:bg-[#e8dcc8] disabled:text-[#7a6a55]"
+              >
+                {isInCart ? "In cart" : "E-book"}
+              </button>
+            )}
+          </div>
+        </div>
+      </MotionReveal>
+    );
+  };
+
   return (
     <section id="books" className="bg-[#f5f1e8] text-[#1b1711]">
       <style>{`
@@ -532,146 +728,56 @@ export default function Books() {
                   </span>
                 </button>
               ) : null}
+
             </div>
           </div>
         </MotionReveal>
 
-        <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {books.map((pkg, idx) => {
-            const isFeatured =
-              idx === 0 &&
-              pkg.title === "ACCESS PORTALS FOR SUPERNATURAL BREAKTHROUGHS";
-            const isInCart = isDirectEbookAvailable(pkg) && cartBookIds.includes(pkg.id);
-            const africaEbookLink = pkg.paystackLink || null;
-            const ebookAvailable = isAfricaUser
-              ? Boolean(africaEbookLink)
-              : isDirectEbookAvailable(pkg);
-            const priceTag = getDisplayPrice(pkg, isAfricaUser);
+        <div className="relative mt-10">
+          {!showAllBooks && canScrollBooksLeft ? (
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#f5f1e8] via-[#f5f1e8]/88 to-transparent" />
+          ) : null}
+          {!showAllBooks && canScrollBooksRight ? (
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-14 bg-gradient-to-l from-[#f5f1e8] via-[#f5f1e8]/90 to-transparent" />
+          ) : null}
 
-            return (
-              <MotionReveal
-                key={pkg.id || pkg.title + idx}
-                as="article"
-                delay={80 + idx * 80}
-                distance={30}
-                className={`group relative mx-auto flex w-full max-w-[340px] flex-col overflow-hidden rounded-[26px] border bg-gradient-to-b from-[#fbf8f2] to-[#efe4cf] transition-all duration-500 hover:-translate-y-1.5 ${
-                  isFeatured
-                    ? "border-[#aa8852]/80 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.42)]"
-                    : "border-[#cab28a]/70 shadow-[0_22px_56px_-36px_rgba(0,0,0,0.34)] hover:border-[#b79862]/70 hover:shadow-[0_32px_86px_-36px_rgba(0,0,0,0.45)]"
-                }`}
-                style={isFeatured ? { animation: "featuredGlow 2.8s ease-in-out infinite" } : undefined}
-              >
-                <div className="relative aspect-[4/5] overflow-hidden">
-                  {isFeatured ? (
-                    <span className="absolute right-[-50px] top-5 z-20 w-[190px] rotate-45 border-y border-[#f3deab] bg-[#8f1e1c] py-1 text-center text-[10px] font-extrabold uppercase tracking-[0.18em] text-[#fff5da] shadow-[0_8px_22px_rgba(0,0,0,0.35)]">
-                      New Release
-                    </span>
-                  ) : null}
-                  <img
-                    src={pkg.image}
-                    alt={formatTitle(pkg.title)}
-                    onError={(event) => {
-                      event.currentTarget.src = booksFallbackImage;
-                    }}
-                    className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.05]"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/5 to-transparent" />
-                  <span className="absolute left-4 top-4 inline-flex items-center rounded-full border border-[#f0d7a7]/60 bg-[#20170d]/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#f3d9a2] backdrop-blur-sm">
-                    {priceTag}
-                  </span>
-                  {isAfricaUser ? (
-                    ebookAvailable ? (
-                      <a
-                        href={africaEbookLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${formatTitle(pkg.title)} E-book`}
-                        className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#f0d7a7]/70 bg-[#20170d]/80 text-[#f3d9a2] backdrop-blur-sm transition hover:border-[#fff1c8] hover:bg-[#f5ead2] hover:text-[#231a11]"
-                      >
-                        <PlusIcon className="h-5 w-5" />
-                      </a>
-                    ) : (
-                      <span className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#d8c39d]/60 bg-[#e8dcc8]/90 text-[#7a6a55] backdrop-blur-sm">
-                        <PlusIcon className="h-5 w-5" />
-                      </span>
-                    )
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => addToCart(pkg, { openCart: false })}
-                      disabled={!ebookAvailable}
-                      aria-label={`${isInCart ? "Already in cart:" : "Add"} ${formatTitle(pkg.title)} e-book`}
-                      className="absolute right-4 top-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#f0d7a7]/70 bg-[#20170d]/80 text-[#f3d9a2] backdrop-blur-sm transition hover:border-[#fff1c8] hover:bg-[#f5ead2] hover:text-[#231a11] disabled:cursor-not-allowed disabled:border-[#d8c39d]/60 disabled:bg-[#e8dcc8]/90 disabled:text-[#7a6a55]"
-                    >
-                      <PlusIcon className="h-5 w-5" />
-                    </button>
-                  )}
-                </div>
+          <div
+            id="books-track"
+            ref={showAllBooks ? null : booksTrackRef}
+            className={
+              showAllBooks
+                ? "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+                : "flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth pb-4 pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            }
+          >
+            {books.map(renderBookCard)}
+          </div>
 
-                <div className="flex flex-1 flex-col p-5">
-                  <h3 className="whitespace-pre-line text-[15px] font-bold uppercase tracking-[0.02em] text-[#231a11]">
-                    {pkg.title}
-                  </h3>
-                  <p className="mt-2 text-xs leading-relaxed text-[#5d4e3d]">
-                    {pkg.blurb ||
-                      "A timeless and practical guide. Add this title to your personal library."}{" "}
-                    <button
-                      type="button"
-                      onClick={() => setActiveBook(pkg)}
-                      className="inline font-semibold text-[#8f6b32] underline decoration-[#8f6b32]/60 underline-offset-2 transition hover:text-[#3a2b15] hover:decoration-[#3a2b15]"
-                    >
-                      Read more
-                    </button>
-                  </p>
+          {!showAllBooks && canScrollBooksLeft ? (
+            <SlideArrowButton
+              direction="left"
+              onClick={() => scrollBooks(-1)}
+              ariaLabel="Scroll to previous books"
+            />
+          ) : null}
 
-                  <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
-                    {pkg.amazon ? (
-                      <a
-                        href={pkg.amazon}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-label={`${formatTitle(pkg.title)} Amazon`}
-                        className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-transparent text-sm font-semibold uppercase tracking-[0.12em] text-[#22180f] transition hover:bg-[#22180f] hover:text-[#f7e9cc]"
-                      >
-                        Amazon
-                      </a>
-                    ) : (
-                      <span className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-sm font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
-                        Direct
-                      </span>
-                    )}
+          {!showAllBooks && canScrollBooksRight ? (
+            <SlideArrowButton
+              direction="right"
+              onClick={() => scrollBooks(1)}
+              ariaLabel="Scroll to more books"
+            />
+          ) : null}
+        </div>
 
-                    {isAfricaUser ? (
-                      ebookAvailable ? (
-                        <a
-                          href={africaEbookLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label={`${formatTitle(pkg.title)} E-book`}
-                          className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11]"
-                        >
-                          E-book
-                        </a>
-                      ) : (
-                        <span className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-sm font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
-                          Coming soon
-                        </span>
-                      )
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => addToCart(pkg)}
-                        disabled={!ebookAvailable}
-                        className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11] disabled:cursor-not-allowed disabled:border-[#bfa785]/55 disabled:bg-[#e8dcc8] disabled:text-[#7a6a55]"
-                      >
-                        {isInCart ? "In cart" : "E-book"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </MotionReveal>
-            );
-          })}
+        <div className="mt-8 flex justify-center">
+          <button
+            type="button"
+            onClick={() => setShowAllBooks((currentValue) => !currentValue)}
+            className="inline-flex min-w-[220px] items-center justify-center rounded-full border border-[#c9ab77] bg-[#fff8eb] px-6 py-3 text-[11px] font-extrabold uppercase tracking-[0.16em] text-[#4e3a1f] shadow-[0_18px_40px_-28px_rgba(0,0,0,0.55)] transition hover:border-[#6d5530] hover:bg-[#22180f] hover:text-[#f7e9cc]"
+          >
+            {showAllBooks ? "Back To Slider" : `View All ${books.length} Books`}
+          </button>
         </div>
       </Container>
 

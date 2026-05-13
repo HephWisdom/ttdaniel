@@ -28,8 +28,8 @@ function isTabActive(tabPath, location) {
 export default function Topbar({ onMenuToggle }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { adminDisplayName, authEmail } = useAdminBlog();
-  const avatarLetter = String(adminDisplayName || "A").trim().charAt(0).toUpperCase() || "A";
+  const { adminDisplayName, authEmail, signOut } = useAdminBlog();
+  const avatarLetter = String(authEmail || adminDisplayName || "A").trim().charAt(0).toUpperCase() || "A";
 
   return (
     <header className="blog-admin-topbar">
@@ -71,9 +71,12 @@ export default function Topbar({ onMenuToggle }) {
         <button type="button" className="blog-admin-avatar-wrapper">
           <span className="blog-admin-avatar">{avatarLetter}</span>
           <span className="blog-admin-avatar-meta">
-            <span className="blog-admin-avatar-name">{adminDisplayName || "TT DANIEL"}</span>
             {authEmail ? <span className="blog-admin-avatar-email">{authEmail}</span> : null}
           </span>
+        </button>
+
+        <button type="button" className="blog-admin-btn-outline blog-admin-auth-action" onClick={signOut}>
+          Log out
         </button>
       </div>
     </header>
