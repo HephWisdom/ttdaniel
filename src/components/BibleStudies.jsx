@@ -37,21 +37,28 @@ export default function BibleStudies() {
                 <span className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#c6a15f] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-black/45">
-                  {study.key === "pray-together" ? "Prayer Track" : "Study track"}
+                  {study.status ||
+                    (study.key === "pray-together" ? "Prayer Track" : "Study track")}
                 </p>
-                <h3 className="mt-4 max-w-[15ch] text-[34px] font-extrabold uppercase leading-[1.02] tracking-tight">
+                <h3 className="mt-4 max-w-[16ch] text-[34px] font-extrabold uppercase leading-[1.02] tracking-tight">
                   {study.title}
                 </h3>
                 <p className="mt-5 max-w-[34ch] text-sm leading-relaxed text-black/65">
-                  {study.summary}
+                  {study.cardSummary || study.teaser || study.summary}
                 </p>
                 <div
                   className={`mt-auto flex flex-wrap gap-3 ${
                     study.key === "pray-together" ? "justify-center" : ""
                   }`}
                 >
-                  {study.key === "bible-studies" ||
-                  study.key === "salvation-army" ? (
+                  {study.registrationEnabled ? (
+                    <Link
+                      to={`/spirituality/${study.key}`}
+                      className="inline-flex h-11 min-w-[190px] items-center justify-center border border-[#8f6b32] bg-black px-6 text-sm font-semibold uppercase tracking-[0.12em] text-[#efd9aa] transition hover:bg-[#8f6b32] hover:text-white"
+                    >
+                      Pre-register
+                    </Link>
+                  ) : study.key === "bible-studies" ? (
                     <span className="inline-flex h-11 min-w-[190px] cursor-not-allowed items-center justify-center border border-black/15 bg-black/5 px-6 text-sm font-semibold uppercase tracking-[0.12em] text-black/45">
                       Coming Soon
                     </span>

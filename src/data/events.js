@@ -30,17 +30,17 @@ export const featuredEvents = [
   },
   {
     title: "Annual Holy Convocation (GHA) 2026",
-    date: "Register before 25TH MAY, 2026",
+    date: "Register before 15TH NOV, 2026",
     price: "REGISTER NOW",
     venue: "Week-long Holy Services (See poster for details)",
     desc: "Ends with ordination of new pastors, consecration of apostles and bishops with licenses. Attend for spiritual empowerment.",
     details:
-      "The Annual Holy Convocation (GHA) 2026 is here. This week-long event ends with ordination of new pastors, consecration of apostles, and bishops with licenses. If you are looking forward to these holy services or want to attend for spiritual empowerment, register before 25th May, 2026. More details are available in the registration form.",
+      "The Annual Holy Convocation (GHA) 2026 is here. This week-long event ends with ordination of new pastors, consecration of apostles, and bishops with licenses. If you are looking forward to these holy services or want to attend for spiritual empowerment, register before 15th November, 2026. More details are available in the registration form.",
     img: newEventPoster,
     detailsHref:
       "https://docs.google.com/forms/d/1pqLicySzLpO527CJn7VqahWY_3SkpzY93FQL7uiYCIg/preview",
     isExternal: true,
-    deadline: "2026-05-25",
+    deadline: "2026-11-15",
   },
 ];
 

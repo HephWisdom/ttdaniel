@@ -526,8 +526,8 @@ export default function Books() {
         distance={30}
         className={`group relative flex flex-col overflow-hidden rounded-[26px] border bg-gradient-to-b from-[#fbf8f2] to-[#efe4cf] transition-all duration-500 hover:-translate-y-1.5 ${
           showAllBooks
-            ? "mx-auto w-full max-w-[340px]"
-            : "w-[292px] shrink-0 snap-start sm:w-[320px]"
+            ? "mx-auto w-full max-w-[240px]"
+            : "w-[188px] shrink-0 snap-start sm:w-[208px]"
         } ${
           isFeatured
             ? "border-[#aa8852]/80 shadow-[0_24px_60px_-36px_rgba(0,0,0,0.42)]"
@@ -605,12 +605,12 @@ export default function Books() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`${formatTitle(pkg.title)} Amazon`}
-                className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-transparent text-sm font-semibold uppercase tracking-[0.12em] text-[#22180f] transition hover:bg-[#22180f] hover:text-[#f7e9cc]"
+                className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[#2b2116] bg-transparent text-[13px] font-semibold uppercase tracking-[0.1em] text-[#22180f] transition hover:bg-[#22180f] hover:text-[#f7e9cc]"
               >
                 Amazon
               </a>
             ) : (
-              <span className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-sm font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
+              <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-[13px] font-semibold uppercase tracking-[0.1em] text-[#7a6a55]">
                 Direct
               </span>
             )}
@@ -622,12 +622,12 @@ export default function Books() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`${formatTitle(pkg.title)} E-book`}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11]"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-[13px] font-semibold uppercase tracking-[0.1em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11]"
                 >
                   E-book
                 </a>
               ) : (
-                <span className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-sm font-semibold uppercase tracking-[0.12em] text-[#7a6a55]">
+                <span className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[#bfa785]/55 bg-[#e8dcc8] text-[13px] font-semibold uppercase tracking-[0.1em] text-[#7a6a55]">
                   Coming soon
                 </span>
               )
@@ -636,7 +636,7 @@ export default function Books() {
                 type="button"
                 onClick={() => addToCart(pkg)}
                 disabled={!ebookAvailable}
-                className="inline-flex h-11 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-sm font-semibold uppercase tracking-[0.12em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11] disabled:cursor-not-allowed disabled:border-[#bfa785]/55 disabled:bg-[#e8dcc8] disabled:text-[#7a6a55]"
+                className="inline-flex h-10 w-full items-center justify-center rounded-md border border-[#2b2116] bg-[#22180f] text-[13px] font-semibold uppercase tracking-[0.1em] text-[#f7e9cc] transition hover:border-[#6d5530] hover:bg-[#f5ead2] hover:text-[#231a11] disabled:cursor-not-allowed disabled:border-[#bfa785]/55 disabled:bg-[#e8dcc8] disabled:text-[#7a6a55]"
               >
                 {isInCart ? "In cart" : "E-book"}
               </button>
@@ -747,7 +747,7 @@ export default function Books() {
             className={
               showAllBooks
                 ? "grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
-                : "flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth pb-4 pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                : "flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-4 pr-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             }
           >
             {books.map(renderBookCard)}

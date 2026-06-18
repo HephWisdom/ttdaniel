@@ -16,13 +16,19 @@ export const bibleStudies = [
       "https://us06web.zoom.us/j/6517935609?pwd=NMlOlCOJ9eitIMpn0nGRwGfP0p11Ev.1",
   },
   {
-    key: "salvation-army",
-    title: "Soteriology",
-    groups: "4 groups subscribed",
+    key: "discerning-ministry-class",
+    title: "Discerning Ministry Class (DMC)",
+    groups: "Pre-registration open",
     image: opendoor2,
-    summary: "Heaven Mindedness",
+    status: "Coming Soon",
+    registrationEnabled: true,
+    summary: "Pre-registration is now open for the Discerning Ministry Class.",
+    cardSummary:
+      "Uncertain about your purpose or calling? DMC will help guide your discernment journey.",
+    teaser:
+      'Are you still in confusion about what exactly your life on earth is all about? Do you feel "Called" but just not certain? Are you having questions? Then register for the Discerning Ministry Class. DMC will help you in your discernment process. We are accepting pre-registration.',
     details:
-      "This track focuses on spiritual discipline, conviction, and community. Participants explore what it means to stand for Christ in family, work, and society while staying rooted in grace and truth. Each session ends with reflection questions and practical action steps.",
+      'Are you still in confusion about what exactly your life on earth is all about? Do you feel "Called" but just not certain? Are you having questions? Then register for the Discerning Ministry Class. DMC will help you in your discernment process. We are accepting pre-registration.',
   },
   {
     key: "bible-studies",

@@ -51,7 +51,15 @@ const hostingerRoutes = (
 
 mkdirSync(distDir, { recursive: true });
 
-const htaccess = `<IfModule mod_rewrite.c>
+const htaccess = `<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Strict-Transport-Security "max-age=31536000"
+</IfModule>
+
+<IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase ${basePath}
   Options -MultiViews

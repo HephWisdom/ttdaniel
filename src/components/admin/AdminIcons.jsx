@@ -65,6 +65,15 @@ export function SubscribersIcon() {
   );
 }
 
+export function DmcIcon() {
+  return (
+    <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 5h16v12H4z" />
+      <path d="M8 21h8M12 17v4M8 9h8M8 13h5" />
+    </svg>
+  );
+}
+
 export function EbookIcon() {
   return (
     <svg fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true">

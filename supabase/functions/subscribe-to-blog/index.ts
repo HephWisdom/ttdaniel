@@ -100,11 +100,6 @@ async function sha256Hex(value: string) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function isMissingRateLimitTableError(error: { code?: string; message?: string } | null | undefined) {
-  const message = String(error?.message || "").toLowerCase();
-  return error?.code === "42P01" || message.includes("edge_request_guards");
-}
-
 async function ensureRequestWithinRateLimit({
   adminClient,
   actorHash,
@@ -114,8 +109,6 @@ async function ensureRequestWithinRateLimit({
   actorHash: string;
   emailHash: string;
 }) {
-  const cutoffIso = new Date(Date.now() - SUBSCRIBE_RATE_LIMIT_WINDOW_MS).toISOString();
-
   const checks = [
     {
       scope: "actor",
@@ -130,42 +123,21 @@ async function ensureRequestWithinRateLimit({
   ];
 
   for (const check of checks) {
-    const { count, error } = await adminClient
-      .from("edge_request_guards")
-      .select("id", { count: "exact", head: true })
-      .eq("endpoint", "subscribe_to_blog")
-      .eq("scope", check.scope)
-      .eq("subject_hash", check.subjectHash)
-      .gte("created_at", cutoffIso);
+    const { data, error } = await adminClient.rpc("consume_edge_request_limit", {
+      p_endpoint: "subscribe_to_blog",
+      p_scope: check.scope,
+      p_subject_hash: check.subjectHash,
+      p_window_seconds: Math.floor(SUBSCRIBE_RATE_LIMIT_WINDOW_MS / 1000),
+      p_max_requests: check.limit,
+    });
 
     if (error) {
-      if (isMissingRateLimitTableError(error)) {
-        return;
-      }
-
-      throw new Error(error.message || "Unable to verify request rate limit.");
+      throw new Error("Subscription rate limiting is not configured.");
     }
 
-    if (Number(count || 0) >= check.limit) {
+    if (data !== true) {
       throw new Error("Too many subscription attempts. Please try again later.");
     }
-  }
-
-  const { error: insertError } = await adminClient.from("edge_request_guards").insert([
-    {
-      endpoint: "subscribe_to_blog",
-      scope: "actor",
-      subject_hash: actorHash,
-    },
-    {
-      endpoint: "subscribe_to_blog",
-      scope: "email",
-      subject_hash: emailHash,
-    },
-  ]);
-
-  if (insertError && !isMissingRateLimitTableError(insertError)) {
-    throw new Error(insertError.message || "Unable to store request rate limit state.");
   }
 }
 

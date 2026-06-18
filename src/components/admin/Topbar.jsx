@@ -13,6 +13,7 @@ const tabs = [
   { label: "Drafts", path: "/admin/blog/drafts" },
   { label: "Analytics", path: "/admin/blog/analytics" },
   { label: "Subscribers", path: "/admin/blog/subscribers" },
+  { label: "DMC", path: "/admin/blog/dmc-registrations" },
   { label: "E-books", path: "/admin/blog/ebooks" },
   { label: "Donations", path: "/admin/blog/donations" },
 ];

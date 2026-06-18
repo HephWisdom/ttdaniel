@@ -1232,50 +1232,40 @@ export async function createBlogComment(postId, input) {
     return comment;
   }
 
-  const { data, error } = await supabase
-    .from("blog_comments")
-    .insert(payload)
-    .select("id,post_id,name,message,created_at,is_approved")
-    .maybeSingle();
+  const { data, error } = await supabase.functions.invoke("submit-blog-comment", {
+    body: {
+      postId: payload.post_id,
+      name: payload.name,
+      message: payload.message,
+      website: sanitizeCommentText(input?.website, 120),
+    },
+  });
 
-  if (error && !isMissingApprovedColumnError(error)) {
-    throw new Error(error.message);
+  if (error) {
+    let message = error.message || "Unable to submit the comment.";
+    try {
+      const responseBody = await error.context?.json();
+      message = responseBody?.error || responseBody?.message || message;
+    } catch {
+      // Use the function error message when the response is not JSON.
+    }
+
+    throw new Error(message);
   }
 
-  if (error && isMissingApprovedColumnError(error)) {
-    const legacyPayload = {
+  if (!data?.comment) {
+    markCommentSubmittedNow();
+    return normalizeComment({
       post_id: payload.post_id,
       name: payload.name,
       message: payload.message,
-    };
-    const { data: legacyData, error: legacyError } = await supabase
-      .from("blog_comments")
-      .insert(legacyPayload)
-      .select("id,post_id,name,message,created_at")
-      .maybeSingle();
-
-    if (legacyError) {
-      throw new Error(legacyError.message);
-    }
-
-    if (!legacyData) {
-      throw new Error(
-        "Comment was created but no row was returned. Check RLS/select policy on blog_comments."
-      );
-    }
-
-    markCommentSubmittedNow();
-    return normalizeComment(legacyData);
-  }
-
-  if (!data) {
-    throw new Error(
-      "Comment was created but no row was returned. Check RLS/select policy on blog_comments."
-    );
+      is_approved: false,
+      created_at: new Date().toISOString(),
+    });
   }
 
   markCommentSubmittedNow();
-  return normalizeComment(data);
+  return normalizeComment(data.comment);
 }
 
 export async function fetchPendingBlogComments() {

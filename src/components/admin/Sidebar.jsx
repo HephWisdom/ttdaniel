@@ -4,6 +4,7 @@ import {
   AnalyticsIcon,
   ArticleIcon,
   CalendarIcon,
+  DmcIcon,
   DonationIcon,
   DraftIcon,
   EbookIcon,
@@ -38,6 +39,13 @@ function getSidebarItems(location) {
       active: location.pathname.startsWith("/admin/blog/subscribers"),
       onClickPath: "/admin/blog/subscribers",
       icon: <SubscribersIcon />,
+    },
+    {
+      key: "dmc-registrations",
+      title: "DMC Registrations",
+      active: location.pathname.startsWith("/admin/blog/dmc-registrations"),
+      onClickPath: "/admin/blog/dmc-registrations",
+      icon: <DmcIcon />,
     },
     {
       key: "ebooks",

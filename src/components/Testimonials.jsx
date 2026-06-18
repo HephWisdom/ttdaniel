@@ -8,17 +8,18 @@ import bookTestimonyThree from "../assets/testimonials/3.mp4";
 import bookTestimonyFour from "../assets/testimonials/4.mp4";
 import bookTestimonyFive from "../assets/testimonials/5.mp4";
 import bookTestimonySix from "../assets/testimonials/6.mp4";
+import newBookTestimony from "../assets/testimonials/newtestimonials.mp4";
 
 const BOOK_VIDEO_TESTIMONIALS = [
   {
-    id: "book-testimony-1",
-    video: bookTestimonyOne,
-    title: "Reader Reflection",
+    id: "book-testimony-new",
+    video: newBookTestimony,
+    title: "Featured Testimony",
   },
   {
-    id: "book-testimony-2",
-    video: bookTestimonyTwo,
-    title: "Life-Giving Insight",
+    id: "book-testimony-6",
+    video: bookTestimonySix,
+    title: "Life Changing",
   },
   {
     id: "book-testimony-3",
@@ -28,7 +29,12 @@ const BOOK_VIDEO_TESTIMONIALS = [
   {
     id: "book-testimony-4",
     video: bookTestimonyFour,
-    title: "Transformation Story",
+    title: "Transforming Story",
+  },
+  {
+    id: "book-testimony-2",
+    video: bookTestimonyTwo,
+    title: "Life-Giving Insight",
   },
   {
     id: "book-testimony-5",
@@ -36,9 +42,9 @@ const BOOK_VIDEO_TESTIMONIALS = [
     title: "Featured Moment",
   },
   {
-    id: "book-testimony-6",
-    video: bookTestimonySix,
-    title: "Live Gathering",
+    id: "book-testimony-1",
+    video: bookTestimonyOne,
+    title: "Reader Reflection",
   },
 ];
 

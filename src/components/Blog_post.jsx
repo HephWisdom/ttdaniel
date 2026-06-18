@@ -116,7 +116,7 @@ export default function BlogPost() {
             className="text-center text-[48px] font-black uppercase leading-[0.9] tracking-tight text-black sm:text-[64px] md:text-[94px]"
             style={{ fontFamily: "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" }}
           >
-            Latest Blogs
+            tending faith
           </h2>
 
           {isLoading ? <p className="mt-8 text-center text-sm text-black/70">Loading blog posts...</p> : null}

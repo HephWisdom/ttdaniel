@@ -6,6 +6,7 @@ import Topbar from "../components/admin/Topbar";
 import AnalyticsPage from "./admin/AnalyticsPage";
 import CreatePage from "./admin/CreatePage";
 import DonationsPage from "./admin/DonationsPage";
+import DmcRegistrationsPage from "./admin/DmcRegistrationsPage";
 import DraftsPage from "./admin/DraftsPage";
 import EbookPurchasesPage from "./admin/EbookPurchasesPage";
 import OverviewPage from "./admin/OverviewPage";
@@ -829,6 +830,7 @@ export default function AdminBlog() {
                 <Route path="drafts" element={<DraftsPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="subscribers" element={<SubscribersPage />} />
+                <Route path="dmc-registrations" element={<DmcRegistrationsPage />} />
                 <Route path="ebooks" element={<EbookPurchasesPage />} />
                 <Route path="donations" element={<DonationsPage />} />
                 <Route path="*" element={<Navigate to="/admin/blog" replace />} />

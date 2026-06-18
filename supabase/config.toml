@@ -7,5 +7,14 @@ verify_jwt = true
 [functions.list-blog-subscribers]
 verify_jwt = true
 
+[functions.register-for-dmc]
+verify_jwt = false
+
+[functions.send-dmc-message]
+verify_jwt = true
+
+[functions.submit-blog-comment]
+verify_jwt = false
+
 [functions.stripe-webhook]
 verify_jwt = false
