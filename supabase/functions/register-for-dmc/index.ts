@@ -158,7 +158,10 @@ function registrationAcceptedResponse(siteUrl: string, request: Request) {
 
 function buildConfirmationHtml(siteUrl: string, fullName: string) {
   const safeName = escapeHtml(fullName || "friend");
-  const dmcUrl = new URL("/spirituality/discerning-ministry-class", siteUrl).toString();
+  const dmcUrl = new URL(
+    "/spirituality/discerning-ministry-class/#dmc-registration",
+    siteUrl
+  ).toString();
 
   return `
     <div style="background:#f1f2ef;padding:32px 16px;font-family:Arial,sans-serif;color:#181410;">
@@ -189,7 +192,10 @@ function buildConfirmationHtml(siteUrl: string, fullName: string) {
 }
 
 function buildConfirmationText(siteUrl: string, fullName: string) {
-  const dmcUrl = new URL("/spirituality/discerning-ministry-class", siteUrl).toString();
+  const dmcUrl = new URL(
+    "/spirituality/discerning-ministry-class/#dmc-registration",
+    siteUrl
+  ).toString();
 
   return [
     `Hello ${fullName || "friend"},`,

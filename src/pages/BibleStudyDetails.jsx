@@ -1,11 +1,68 @@
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Container from "../components/ui/Container";
 import DmcRegistrationForm from "../components/DmcRegistrationForm";
 import { getBibleStudyByKey } from "../data/bibleStudies";
 
+const DMC_REGISTRATION_PATH =
+  "spirituality/discerning-ministry-class/#dmc-registration";
+
+function buildDmcRegistrationUrl() {
+  if (typeof window === "undefined") {
+    return `/${DMC_REGISTRATION_PATH}`;
+  }
+
+  const baseUrl = new URL(import.meta.env.BASE_URL || "/", window.location.origin);
+  return new URL(DMC_REGISTRATION_PATH, baseUrl).toString();
+}
+
 export default function BibleStudyDetails() {
   const { studyKey } = useParams();
   const study = getBibleStudyByKey(studyKey);
+  const [shareStatus, setShareStatus] = useState("");
+  const registrationUrl = buildDmcRegistrationUrl();
+
+  useEffect(() => {
+    if (!study?.registrationEnabled) return undefined;
+
+    const previousTitle = document.title;
+    document.title = "Discerning Ministry Class Registration | TT Daniel";
+
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [study]);
+
+  const handleShareRegistration = async () => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Discerning Ministry Class Registration",
+          text: "Pre-register for the Discerning Ministry Class.",
+          url: registrationUrl,
+        });
+        setShareStatus("Shared");
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(registrationUrl);
+        setShareStatus("Link copied");
+      } else {
+        const fallbackInput = document.createElement("input");
+        fallbackInput.value = registrationUrl;
+        document.body.appendChild(fallbackInput);
+        fallbackInput.select();
+        document.execCommand("copy");
+        fallbackInput.remove();
+        setShareStatus("Link copied");
+      }
+
+      window.setTimeout(() => setShareStatus(""), 2200);
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        setShareStatus("Copy the link above");
+        window.setTimeout(() => setShareStatus(""), 2200);
+      }
+    }
+  };
 
   if (!study) {
     return (
@@ -80,9 +137,42 @@ export default function BibleStudyDetails() {
                   when available.
                 </p>
               </div>
+              <div className="mt-8 rounded-lg border border-black/10 bg-white p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8f6b32]">
+                  Share registration
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-black/60">
+                  Share this link directly or use it when creating a QR code. It opens at the
+                  registration form.
+                </p>
+                <a
+                  href={registrationUrl}
+                  className="mt-3 block break-all text-sm font-semibold text-[#6f5224] underline decoration-[#6f5224]/30 underline-offset-4 hover:decoration-[#6f5224]"
+                >
+                  {registrationUrl}
+                </a>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <a
+                    href="#dmc-registration"
+                    className="inline-flex h-11 items-center justify-center rounded-lg border border-black bg-black px-5 text-xs font-semibold uppercase tracking-[0.1em] text-white transition hover:border-[#8f6b32] hover:bg-[#8f6b32]"
+                  >
+                    Go to form
+                  </a>
+                  <button
+                    type="button"
+                    onClick={handleShareRegistration}
+                    className="inline-flex h-11 items-center justify-center rounded-lg border border-black/20 bg-white px-5 text-xs font-semibold uppercase tracking-[0.1em] text-black transition hover:border-[#8f6b32] hover:text-[#6f5224]"
+                  >
+                    {shareStatus || "Share link"}
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-[0_28px_70px_-44px_rgba(0,0,0,0.65)]">
+            <div
+              id="dmc-registration"
+              className="scroll-mt-24 overflow-hidden rounded-lg border border-black/10 bg-white shadow-[0_28px_70px_-44px_rgba(0,0,0,0.65)]"
+            >
               <div className="bg-[#151515] p-6 text-white md:p-8">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#dfc184]">
                   Online registration

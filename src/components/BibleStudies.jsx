@@ -53,7 +53,7 @@ export default function BibleStudies() {
                 >
                   {study.registrationEnabled ? (
                     <Link
-                      to={`/spirituality/${study.key}`}
+                      to={`/spirituality/${study.key}/#dmc-registration`}
                       className="inline-flex h-11 min-w-[190px] items-center justify-center border border-[#8f6b32] bg-black px-6 text-sm font-semibold uppercase tracking-[0.12em] text-[#efd9aa] transition hover:bg-[#8f6b32] hover:text-white"
                     >
                       Pre-register

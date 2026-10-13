@@ -1,7 +1,7 @@
 import opendoor1 from "../assets/opendoor1.webp";
 import opendoor2 from "../assets/opendoor2.webp";
 import ghanaTrainingSeminarPoster from "../assets/events/WhatsApp Image 2026-02-12 at 20.25.49.jpeg";
-import newEventPoster from "../assets/events/new-event.jpeg";
+import newEventPoster from "../assets/events/new-event2.jpeg";
 
 export const featuredEvent = {
   title: "Open Door Prayer and Prophetic Expo February 2026",
@@ -30,17 +30,17 @@ export const featuredEvents = [
   },
   {
     title: "Annual Holy Convocation (GHA) 2026",
-    date: "Register before 15TH NOV, 2026",
+    date: "Register before 15TH DEC, 2026",
     price: "REGISTER NOW",
     venue: "Week-long Holy Services (See poster for details)",
     desc: "Ends with ordination of new pastors, consecration of apostles and bishops with licenses. Attend for spiritual empowerment.",
     details:
-      "The Annual Holy Convocation (GHA) 2026 is here. This week-long event ends with ordination of new pastors, consecration of apostles, and bishops with licenses. If you are looking forward to these holy services or want to attend for spiritual empowerment, register before 15th November, 2026. More details are available in the registration form.",
+      "The Annual Holy Convocation (GHA) 2026 is here. This week-long event ends with ordination of new pastors, consecration of apostles, and bishops with licenses. If you are looking forward to these holy services or want to attend for spiritual empowerment, register before 15th December, 2026. More details are available in the registration form.",
     img: newEventPoster,
     detailsHref:
       "https://docs.google.com/forms/d/1pqLicySzLpO527CJn7VqahWY_3SkpzY93FQL7uiYCIg/preview",
     isExternal: true,
-    deadline: "2026-11-15",
+    deadline: "2026-12-15",
   },
 ];
 

@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Link } from "react-router-dom";
+import "./Hero.css";
 import Container from "./ui/Container";
 import mainPortrait from "../assets/ttdaniel1.png";
 import thumbOne from "../assets/gallery/IMG-20260208-WA0015.jpg";
@@ -63,7 +64,7 @@ export default function Hero() {
   };
 
   return (
-    <section className="min-h-screen bg-[#d3d3d3]" data-analytics-section="home">
+    <section className="hero-section min-h-screen bg-[#d3d3d3]" data-analytics-section="home">
       <Container className="h-full max-w-none px-0">
         <div className="min-h-screen w-full bg-[#ececec] px-6 py-6 sm:px-10 sm:py-8 lg:px-12 lg:py-10">
           <div className="grid items-start gap-8 lg:grid-cols-[1fr_1fr] lg:gap-4">
@@ -96,7 +97,7 @@ export default function Hero() {
                               ref={(node) => {
                                 letterRefs.current[currentLetterIndex] = node;
                               }}
-                              className="inline-block transition-transform duration-200 ease-out"
+                              className="hero-letter inline-block transition-transform duration-200 ease-out"
                             >
                               {char}
                             </span>
@@ -123,7 +124,7 @@ export default function Hero() {
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-end">
             <div className="max-w-[35rem]">
-              <div className="mb-2 flex items-center justify-between text-[9px] uppercase tracking-[0.08em] text-black/60 sm:text-[10px]">
+              <div className="hero-captions mb-2 flex items-center justify-between text-[9px] uppercase tracking-[0.08em] text-black/60 sm:text-[10px]">
                 <span>Recent Frames</span>
                 <span className="inline-flex items-center gap-1">
                   Swipe to Scroll

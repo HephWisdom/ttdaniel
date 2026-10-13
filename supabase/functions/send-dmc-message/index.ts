@@ -135,7 +135,10 @@ async function ensureAuthorizedAdmin({
 function buildMessageHtml(fullName: string, message: string, siteUrl: string) {
   const safeName = escapeHtml(fullName || "there");
   const safeMessage = escapeHtml(message).replace(/\n/g, "<br />");
-  const dmcUrl = new URL("/spirituality/discerning-ministry-class", siteUrl).toString();
+  const dmcUrl = new URL(
+    "/spirituality/discerning-ministry-class/#dmc-registration",
+    siteUrl
+  ).toString();
 
   return `
     <div style="background:#f1f2ef;padding:32px 16px;font-family:Arial,sans-serif;color:#181410;">
@@ -160,7 +163,10 @@ function buildMessageHtml(fullName: string, message: string, siteUrl: string) {
 }
 
 function buildMessageText(fullName: string, message: string, siteUrl: string) {
-  const dmcUrl = new URL("/spirituality/discerning-ministry-class", siteUrl).toString();
+  const dmcUrl = new URL(
+    "/spirituality/discerning-ministry-class/#dmc-registration",
+    siteUrl
+  ).toString();
   return [`Hello ${fullName || "there"},`, "", message, "", `DMC details: ${dmcUrl}`].join("\n");
 }
 

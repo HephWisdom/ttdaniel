@@ -1,0 +1,25 @@
+.hero-section ::selection {
+  background: #f1d49e;
+  color: #22170d;
+  text-shadow: 0 0 8px #d3b57f;
+}
+
+.hero-section :is(.hero-letter, p, a),
+.hero-captions > span {
+  transition: color 200ms ease, text-shadow 200ms ease, transform 200ms ease;
+}
+
+@media (hover: hover) {
+  .hero-section :is(.hero-letter, p, a):hover,
+  .hero-captions > span:hover {
+    color: #a17427;
+    text-shadow: 0 0 10px #d3b57fb3, 0 0 22px #f1d49e80;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-section :is(.hero-letter, p, a),
+  .hero-captions > span {
+    transition: none;
+  }
+}
