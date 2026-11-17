@@ -25,11 +25,15 @@ export default function Footer() {
       <Container className="py-24 md:py-32">
         <div className="flex flex-col items-center text-center">
           {/* MOVING LINE — EXTREMELY BIG */}
-          <div className="relative mt-16 w-full overflow-hidden">
-            {/* edge fades */}
-            <div className="pointer-events-none absolute inset-y-0 left-0 w-48 bg-gradient-to-r from-black to-transparent z-10" />
-            <div className="pointer-events-none absolute inset-y-0 right-0 w-48 bg-gradient-to-l from-black to-transparent z-10" />
-
+          <div
+            className="relative mt-16 w-full overflow-hidden"
+            style={{
+              maskImage:
+                "linear-gradient(to right, transparent, black 16%, black 84%, transparent)",
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent, black 16%, black 84%, transparent)",
+            }}
+          >
             {/* track */}
             <div
               className="flex w-[200%] whitespace-nowrap"
