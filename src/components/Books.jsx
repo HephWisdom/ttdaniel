@@ -129,13 +129,17 @@ function CloseIcon({ className = "" }) {
 
 export default function Books() {
   const location = useLocation();
+  const canSelectBooksRegion =
+    typeof window !== "undefined" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
   const checkoutContainerRef = useRef(null);
   const embeddedCheckoutRef = useRef(null);
   const booksTrackRef = useRef(null);
   const bookDetailsRef = useRef(null);
-  const [booksRegion, setBooksRegion] = useState(() =>
-    readBooksRegion(detectAfricaTimezone() ? "africa" : "world")
-  );
+  const [booksRegion, setBooksRegion] = useState(() => {
+    const detectedRegion = detectAfricaTimezone() ? "africa" : "world";
+    return canSelectBooksRegion ? readBooksRegion(detectedRegion) : detectedRegion;
+  });
   const isAfricaUser = booksRegion === "africa";
   const [activeBook, setActiveBook] = useState(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
@@ -222,12 +226,14 @@ export default function Books() {
   }, [cartBookIds, cartBooks]);
 
   useEffect(() => {
+    if (!canSelectBooksRegion) return;
+
     try {
       window.localStorage.setItem(BOOKS_REGION_STORAGE_KEY, booksRegion);
     } catch {
       // Keep the selected region for this visit when storage is unavailable.
     }
-  }, [booksRegion]);
+  }, [booksRegion, canSelectBooksRegion]);
 
   useEffect(() => {
     if (isAfricaUser && isCartOpen) {
@@ -597,16 +603,18 @@ export default function Books() {
           </div>
         </MotionReveal>
 
-        <div className="books-region-selector">
-          <span id="books-region-label">Shopping region</span>
-          <div className="books-region-options" role="group" aria-labelledby="books-region-label">
-            {[{ label: "Africa", value: "africa" }, { label: "Rest of the world", value: "world" }].map((option) => (
-              <button key={option.value} type="button" aria-pressed={booksRegion === option.value}
-                onClick={() => { setBooksRegion(option.value); setActiveBook(null); }}>{option.label}</button>
-            ))}
+        {canSelectBooksRegion && (
+          <div className="books-region-selector">
+            <span id="books-region-label">Shopping region</span>
+            <div className="books-region-options" role="group" aria-labelledby="books-region-label">
+              {[{ label: "Africa", value: "africa" }, { label: "Rest of the world", value: "world" }].map((option) => (
+                <button key={option.value} type="button" aria-pressed={booksRegion === option.value}
+                  onClick={() => { setBooksRegion(option.value); setActiveBook(null); }}>{option.label}</button>
+              ))}
+            </div>
+            <p aria-live="polite">{isAfricaUser ? "Prices in GHS" : "Prices in USD"}</p>
           </div>
-          <p aria-live="polite">{isAfricaUser ? "Prices in GHS" : "Prices in USD"}</p>
-        </div>
+        )}
 
         <div className="books-toolbar">
           <p>{books.length} books <span>· Find your next read</span></p>

@@ -29,18 +29,20 @@ export const featuredEvents = [
     deadline: "2026-03-02",
   },
   {
-    title: "Annual Holy Convocation (GHA) 2026",
-    date: "Register before 15TH DEC, 2026",
+    title: "Annual Holy Convocation (GHA) 2027",
+    date: "Rescheduled: 18–21 FEB, 2027",
     price: "REGISTER NOW",
-    venue: "Week-long Holy Services (See poster for details)",
+    venue: "Four-day Holy Services (See poster for venue details)",
     desc: "Ends with ordination of new pastors, consecration of apostles and bishops with licenses. Attend for spiritual empowerment.",
     details:
-      "The Annual Holy Convocation (GHA) 2026 is here. This week-long event ends with ordination of new pastors, consecration of apostles, and bishops with licenses. If you are looking forward to these holy services or want to attend for spiritual empowerment, register before 15th December, 2026. More details are available in the registration form.",
+      "The Annual Holy Convocation (GHA) has been postponed to February 18–21, 2027. This four-day event ends with ordination of new pastors, consecration of apostles, and bishops with licenses. If you are looking forward to these holy services or want to attend for spiritual empowerment, registration closes on February 18, 2027. The poster shows the original dates; the rescheduled event dates are February 18–21, 2027. More details are available in the registration form.",
+    posterNotice:
+      "Postponed to February 18–21, 2027. The poster shows the original dates.",
     img: newEventPoster,
     detailsHref:
       "https://docs.google.com/forms/d/1pqLicySzLpO527CJn7VqahWY_3SkpzY93FQL7uiYCIg/preview",
     isExternal: true,
-    deadline: "2026-12-15",
+    deadline: "2027-02-18",
   },
 ];
 

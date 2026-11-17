@@ -144,6 +144,12 @@ export default function Events() {
           </div>
         </div>
 
+        {event.posterNotice ? (
+          <p className="border-b border-[#e8c985]/30 bg-[#e8c985]/10 px-4 py-3 text-xs font-semibold leading-relaxed text-[#f3dca6]">
+            {event.posterNotice}
+          </p>
+        ) : null}
+
         <div className="flex flex-1 flex-col p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">
             {event.date}

@@ -32,7 +32,34 @@ const nav = [
   { href: "#counselling", label: "Counselling" },
   { href: "#spirituality", label: "Spirituality" },
   { href: "#blog", label: "Blog" },
+  {
+    href: "https://novaemoney.com/blessings247",
+    label: "Financial Wellness",
+    external: true,
+  },
 ];
+
+function NavigationLink({ item, buildTo, ...props }) {
+  if (item.external) {
+    return (
+      <a
+        {...props}
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`${item.label} (opens in a new tab)`}
+      >
+        {item.label} <span aria-hidden="true">↗</span>
+      </a>
+    );
+  }
+
+  return (
+    <Link {...props} to={buildTo(item.href)}>
+      {item.label}
+    </Link>
+  );
+}
 
 const socialLinks = [
   {
@@ -178,15 +205,14 @@ export default function Header() {
           </div>
 
           {/* Desktop nav */}
-          <nav className="ml-auto hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1 lg:flex xl:gap-2 xl:p-1.5">
+          <nav className="ml-auto hidden items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] p-1 lg:flex xl:p-1.5">
             {nav.map((item) => (
-              <Link
+              <NavigationLink
                 key={item.href}
-                to={buildTo(item.href)}
-                className="rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-white/10 hover:text-white xl:px-4 xl:text-xs xl:tracking-[0.16em]"
-              >
-                {item.label}
-              </Link>
+                item={item}
+                buildTo={buildTo}
+                className="whitespace-nowrap rounded-full px-2 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-white/10 hover:text-white xl:px-3 xl:text-xs xl:tracking-[0.16em]"
+              />
             ))}
           </nav>
           <Link
@@ -215,14 +241,13 @@ export default function Header() {
             >
               <nav className="grid gap-2">
                 {nav.map((item) => (
-                  <Link
+                  <NavigationLink
                     key={item.href}
-                    to={buildTo(item.href)}
+                    item={item}
+                    buildTo={buildTo}
                     onClick={() => setOpen(false)}
                     className="rounded-2xl border border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-white hover:border-white/40 hover:bg-white/10 transition"
-                  >
-                    {item.label}
-                  </Link>
+                  />
                 ))}
                 <Link
                   to={donatePath}
